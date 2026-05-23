@@ -289,9 +289,16 @@ else
     using var db = DbFactory.CreateDbContext();
     var oggi = DateTime.Today;
 
-    var scadute = await db.RichiestaFerie
-        .Where(r => r.Stato == StatoRichiesta.InAttesa && r.DataInizio < oggi)
-        .ToListAsync();
+    IQueryable<RichiestaFerie> query = db.RichiestaFerie
+        .Include(r => r.Utente)
+        .Where(r => r.Stato == StatoRichiesta.InAttesa && r.DataInizio < oggi);
+
+    if (Auth.IsCapo)
+      query = query.Where(r => r.Utente.AziendaId == Auth.AziendaId);
+    else
+      query = query.Where(r => r.UtenteId == Auth.UtenteId);
+
+    var scadute = await query.ToListAsync();
 
     if (scadute.Any())
     {
@@ -307,11 +314,12 @@ else
     if (Auth.IsCapo)
     {
       dipendenti = await db.Utenti
-          .Where(u => u.Ruolo == Ruolo.Dipendente)
+          .Where(u => u.Ruolo == Ruolo.Dipendente && u.AziendaId == Auth.AziendaId)
           .ToListAsync();
 
       tutteLeRichieste = await db.RichiestaFerie
           .Include(r => r.Utente)
+          .Where(r => r.Utente.AziendaId == Auth.AziendaId)
           .OrderBy(r => r.DataInizio)
           .ToListAsync();
     }
