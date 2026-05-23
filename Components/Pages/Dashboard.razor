@@ -280,28 +280,29 @@ else
 
     if (Auth.IsCapo)
     {
-      totaleDipendenti = await db.Utenti.CountAsync(u => u.Ruolo == Ruolo.Dipendente);
-      richiesteInAttesa = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.InAttesa);
+      totaleDipendenti = await db.Utenti.CountAsync(u => u.Ruolo == Ruolo.Dipendente && u.AziendaId == Auth.AziendaId);
+      richiesteInAttesa = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.InAttesa && r.Utente.AziendaId == Auth.AziendaId);
       richiesteApprovate = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.Approvata &&
-        r.DataRichiesta.Month == ora.Month);
+        r.DataRichiesta.Month == ora.Month && r.Utente.AziendaId == Auth.AziendaId);
       richiesteRifiutate = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.Rifiutata &&
-        r.DataRichiesta.Month == ora.Month);
+        r.DataRichiesta.Month == ora.Month && r.Utente.AziendaId == Auth.AziendaId);
 
       richiesteAttesa = await db.RichiestaFerie
           .Include(r => r.Utente)
-          .Where(r => r.Stato == StatoRichiesta.InAttesa)
+          .Where(r => r.Stato == StatoRichiesta.InAttesa && r.Utente.AziendaId == Auth.AziendaId)
           .OrderBy(r => r.DataRichiesta)
           .ToListAsync();
 
       inFerieOggi = await db.RichiestaFerie
           .Include(r => r.Utente)
           .Where(r => r.Stato == StatoRichiesta.Approvata
-              && r.DataInizio <= oggi && r.DataFine >= oggi)
+              && r.DataInizio <= oggi && r.DataFine >= oggi
+              && r.Utente.AziendaId == Auth.AziendaId)
           .ToListAsync();
 
       var saldi = await db.SaldoFerie
           .Include(s => s.Utente)
-          .Where(s => s.Anno == ora.Year)
+          .Where(s => s.Anno == ora.Year && s.Utente.AziendaId == Auth.AziendaId)
           .ToListAsync();
 
       pocheOre = saldi.Where(s => s.OreDisponibili < 16).ToList();
@@ -317,7 +318,7 @@ else
           }).ToList();
 
       var richiesteMese = await db.RichiestaFerie
-          .Where(r => r.DataRichiesta.Year == ora.Year)
+          .Where(r => r.DataRichiesta.Year == ora.Year && r.Utente.AziendaId == Auth.AziendaId)
           .ToListAsync();
 
       richiestePerMese = richiesteMese
@@ -364,7 +365,7 @@ else
 
     var saldi = await db.SaldoFerie
         .Include(s => s.Utente)
-        .Where(s => s.Anno == ora.Year)
+        .Where(s => s.Anno == ora.Year && s.Utente.AziendaId == Auth.AziendaId)
         .ToListAsync();
 
     oreDipendenti = saldi
@@ -378,7 +379,7 @@ else
         }).ToList();
 
     var richiesteMese = await db.RichiestaFerie
-        .Where(r => r.DataRichiesta.Year == ora.Year)
+        .Where(r => r.DataRichiesta.Year == ora.Year && r.Utente.AziendaId == Auth.AziendaId)
         .ToListAsync();
 
     richiestePerMese = richiesteMese

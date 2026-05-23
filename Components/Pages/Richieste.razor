@@ -99,6 +99,7 @@ else
     using var db = DbFactory.CreateDbContext();
     richieste = await db.RichiestaFerie
         .Include(r => r.Utente)
+        .Where(r => r.Utente.AziendaId == Auth.AziendaId)
         .OrderByDescending(r => r.DataRichiesta)
         .ToListAsync();
   }
