@@ -101,7 +101,7 @@ else
 }
 
 @code {
-  List<Azienda> aziende = new();
+  List<GestioneFerie.Web.Models.Azienda> aziende = new();
   Dictionary<int, int> conteggioUtenti = new();
   bool mostraModalNuova = false;
   bool creando = false;
@@ -174,7 +174,7 @@ else
     db.Utenti.Add(capo);
     await db.SaveChangesAsync();
 
-    var azienda = new Azienda
+    var azienda = new GestioneFerie.Web.Models.Azienda
     {
       Nome = nuovoNomeAzienda,
       EmailMalattia = string.IsNullOrWhiteSpace(nuovaEmailMalattia) ? null : nuovaEmailMalattia,
