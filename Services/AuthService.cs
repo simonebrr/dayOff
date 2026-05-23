@@ -13,6 +13,7 @@ public class AuthService
   public int? UtenteId { get; private set; }
   public string? UtenteNome { get; private set; }
   public string? UtenteRuolo { get; private set; }
+  public int? AziendaId { get; private set; }
   public bool IsAuthenticated => UtenteId != null;
   public bool IsCapo => UtenteRuolo == "Capo";
 
@@ -39,27 +40,18 @@ public class AuthService
 
     if (utente == null || !BCrypt.Net.BCrypt.Verify(password, utente.PasswordHash))
     {
-      db.LoginAttempts.Add(new LoginAttempt
-      {
-        Email = email,
-        IpAddress = "unknown",
-        Successo = false
-      });
+      db.LoginAttempts.Add(new LoginAttempt { Email = email, IpAddress = "unknown", Successo = false });
       await db.SaveChangesAsync();
       return (false, "Email o password non corretti.");
     }
 
-    db.LoginAttempts.Add(new LoginAttempt
-    {
-      Email = email,
-      IpAddress = "unknown",
-      Successo = true
-    });
+    db.LoginAttempts.Add(new LoginAttempt { Email = email, IpAddress = "unknown", Successo = true });
     await db.SaveChangesAsync();
 
     UtenteId = utente.Id;
     UtenteNome = utente.Nome;
     UtenteRuolo = utente.Ruolo.ToString();
+    AziendaId = utente.AziendaId;
     OnChange?.Invoke();
 
     return (true, "Login effettuato con successo.");
@@ -70,6 +62,7 @@ public class AuthService
     UtenteId = null;
     UtenteNome = null;
     UtenteRuolo = null;
+    AziendaId = null;
     OnChange?.Invoke();
   }
 }
