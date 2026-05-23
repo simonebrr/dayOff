@@ -39,6 +39,7 @@ else
           <th>Email capo</th>
           <th>Email malattia</th>
           <th>Dipendenti</th>
+          <th>Azioni</th>
         </tr>
       </thead>
       <tbody>
@@ -50,6 +51,9 @@ else
             <td>@a.Capo?.Email</td>
             <td>@(string.IsNullOrEmpty(a.EmailMalattia) ? "— (va al capo)" : a.EmailMalattia)</td>
             <td>@conteggioUtenti.GetValueOrDefault(a.Id)</td>
+            <td>
+              <button class="btn-edit" @onclick="() => ApriModifica(a)">✏️ Modifica</button>
+            </td>
           </tr>
         }
       </tbody>
@@ -72,7 +76,7 @@ else
         <input type="email" @bind="nuovaEmailMalattia" placeholder="hr@azienda.it" />
       </div>
 
-      <hr style="margin: 1rem 0; border-color: var(--border);" />
+      <hr style="margin: 1rem 0; border-color: #eee;" />
       <p style="font-weight:600; margin-bottom:.75rem;">Dati del capo</p>
 
       <div class="form-row">
@@ -100,6 +104,29 @@ else
   </div>
 }
 
+@if (mostraModalModifica)
+{
+  <div class="modal-overlay">
+    <div class="modal">
+      <h3>Modifica azienda</h3>
+
+      <div class="form-group">
+        <label>Nome azienda</label>
+        <input type="text" @bind="modificaNome" />
+      </div>
+      <div class="form-group">
+        <label>Email malattia <span class="hint">(opzionale — se vuota, va al capo)</span></label>
+        <input type="email" @bind="modificaEmailMalattia" placeholder="hr@azienda.it" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-primary" @onclick="SalvaModifica">Salva</button>
+        <button class="btn-cancel" @onclick="() => mostraModalModifica = false">Annulla</button>
+      </div>
+    </div>
+  </div>
+}
+
 @code {
   List<GestioneFerie.Web.Models.Azienda> aziende = new();
   Dictionary<int, int> conteggioUtenti = new();
@@ -113,6 +140,11 @@ else
   string nuovoNomeCapo = "";
   string nuovoCognomeCapo = "";
   string nuovaEmailCapo = "";
+
+  bool mostraModalModifica = false;
+  int modificaAziendaId;
+  string modificaNome = "";
+  string modificaEmailMalattia = "";
 
   protected override async Task OnInitializedAsync()
   {
@@ -137,6 +169,34 @@ else
         .Where(u => u.AziendaId != null && ids.Contains(u.AziendaId!.Value) && u.Ruolo == Ruolo.Dipendente)
         .GroupBy(u => u.AziendaId!.Value)
         .ToDictionaryAsync(g => g.Key, g => g.Count());
+  }
+
+  void ApriModifica(GestioneFerie.Web.Models.Azienda a)
+  {
+    modificaAziendaId = a.Id;
+    modificaNome = a.Nome;
+    modificaEmailMalattia = a.EmailMalattia ?? "";
+    mostraModalModifica = true;
+  }
+
+  async Task SalvaModifica()
+  {
+    if (string.IsNullOrWhiteSpace(modificaNome))
+    {
+      messaggio = "Il nome azienda è obbligatorio.";
+      errore = true;
+      return;
+    }
+    using var db = DbFactory.CreateDbContext();
+    var a = await db.Aziende.FindAsync(modificaAziendaId);
+    if (a == null) return;
+    a.Nome = modificaNome;
+    a.EmailMalattia = string.IsNullOrWhiteSpace(modificaEmailMalattia) ? null : modificaEmailMalattia;
+    await db.SaveChangesAsync();
+    mostraModalModifica = false;
+    messaggio = "Azienda aggiornata!";
+    errore = false;
+    await CaricaAziende();
   }
 
   async Task CreaAzienda()
