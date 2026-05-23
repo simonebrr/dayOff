@@ -10,8 +10,9 @@ public class AppDbContext : DbContext
   public DbSet<Utente> Utenti { get; set; }
   public DbSet<RichiestaFerie> RichiestaFerie { get; set; }
   public DbSet<SaldoFerie> SaldoFerie { get; set; }
-
   public DbSet<LoginAttempt> LoginAttempts { get; set; }
+  public DbSet<Azienda> Aziende { get; set; }
+
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
@@ -29,5 +30,17 @@ public class AppDbContext : DbContext
       .HasOne(s => s.Utente)
       .WithOne(u => u.SaldoFerie)
       .HasForeignKey<SaldoFerie>(s => s.UtenteId);
+
+    modelBuilder.Entity<Azienda>()
+      .HasOne(a => a.Capo)
+      .WithMany()
+      .HasForeignKey(a => a.CapoId)
+      .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<Utente>()
+      .HasOne(u => u.Azienda)
+      .WithMany(a => a.Utenti)
+      .HasForeignKey(u => u.AziendaId)
+      .OnDelete(DeleteBehavior.SetNull);
   }
 }

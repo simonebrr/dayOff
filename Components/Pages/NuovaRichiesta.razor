@@ -2,9 +2,7 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject IDbContextFactory<AppDbContext> DbFactory
-@inject IHttpClientFactory HttpClientFactory
 @inject EmailService EmailService
-@inject IConfiguration Config
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @using GestioneFerie.Web.Data
@@ -301,19 +299,26 @@
 
     if (tipo == "Malattia")
     {
-      var emailHR = Config["EmailHR"] ?? "";
-      if (!string.IsNullOrEmpty(emailHR))
+      using var dbMalattia = DbFactory.CreateDbContext();
+      var utente = await dbMalattia.Utenti
+          .Include(u => u.Azienda)
+          .ThenInclude(a => a!.Capo)
+          .FirstOrDefaultAsync(u => u.Id == Auth.UtenteId);
+      var emailDestinatario = utente?.Azienda?.EmailMalattia
+          ?? utente?.Azienda?.Capo?.Email
+          ?? "";
+      if (!string.IsNullOrEmpty(emailDestinatario))
       {
         await EmailService.InviaAsync(
-            emailHR,
+            emailDestinatario,
             $"🤒 Segnalazione malattia - {Auth.UtenteNome}",
             $"""
-                    <p>Il dipendente <strong>{Auth.UtenteNome}</strong> ha segnalato una malattia.</p>
-                    <p>Codice malattia: <strong>{codiceMalattia}</strong></p>
-                    <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
-                    <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
-                    <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
-                    """
+            <p>Il dipendente <strong>{Auth.UtenteNome}</strong> ha segnalato una malattia.</p>
+            <p>Codice malattia: <strong>{codiceMalattia}</strong></p>
+            <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
+            <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
+            <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
+            """
         );
       }
       messaggio = "Malattia segnalata! Il codice è stato inviato all'ufficio HR.";

@@ -8,6 +8,8 @@ public class Utente
   public string Email { get; set; } = "";
   public string PasswordHash { get; set; } = "";
   public Ruolo Ruolo { get; set; }
+  public int? AziendaId { get; set; }
+  public Azienda? Azienda { get; set; }
   public ICollection<RichiestaFerie> Richieste { get; set; } = new List<RichiestaFerie>();
   public SaldoFerie? SaldoFerie { get; set; }
 }
@@ -15,5 +17,6 @@ public class Utente
 public enum Ruolo
 {
   Dipendente,
-  Capo
+  Capo,
+  SuperAdmin
 }
