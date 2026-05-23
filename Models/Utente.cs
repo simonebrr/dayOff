@@ -17,5 +17,6 @@ public class Utente
 public enum Ruolo
 {
   Dipendente,
-  Capo
+  Capo,
+  SuperAdmin
 }

@@ -266,6 +266,11 @@ else
       Nav.NavigateTo("/login");
       return;
     }
+    if (Auth.IsSuperAdmin)
+    {
+      Nav.NavigateTo("/admin");
+      return;
+    }
     await CaricaDati();
   }
 
