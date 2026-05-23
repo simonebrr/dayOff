@@ -16,6 +16,7 @@ public class AuthService
   public int? AziendaId { get; private set; }
   public bool IsAuthenticated => UtenteId != null;
   public bool IsCapo => UtenteRuolo == "Capo";
+  public bool IsSuperAdmin => UtenteRuolo == "SuperAdmin";
 
   public event Action? OnChange;
 
