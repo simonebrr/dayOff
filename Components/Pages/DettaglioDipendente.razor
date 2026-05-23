@@ -1,0 +1,278 @@
+@page "/dipendente/{Id:int}"
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject EmailService EmailService
+@using GestioneFerie.Web.Services
+@using GestioneFerie.Web.Models
+@using GestioneFerie.Web.Data
+@using Microsoft.EntityFrameworkCore
+@using ApexCharts
+@rendermode InteractiveServer
+
+<PageTitle>Dettaglio dipendente</PageTitle>
+
+@if (utente == null)
+{
+  <div class="empty-state">Dipendente non trovato.</div>
+}
+else
+{
+  <div class="page-header">
+    <div class="header-left">
+      <a href="/dipendenti" class="btn-back">← Torna ai dipendenti</a>
+      <h2>@utente.Nome @utente.Cognome</h2>
+      <p class="subtitle">@utente.Email</p>
+    </div>
+    <button class="btn-danger" @onclick="() => mostraConfermaElimina = true">🗑️ Elimina dipendente</button>
+  </div>
+
+  <div class="grid-3">
+    <div class="metric-card">
+      <div class="metric-label">📅 Ore totali @DateTime.Now.Year</div>
+      <div class="metric-value">@(saldo?.OreTotali ?? 0) h</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">✅ Ore usate</div>
+      <div class="metric-value warning">@(saldo?.OreUsate ?? 0) h</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">🟢 Ore disponibili</div>
+      <div class="metric-value success">@(saldo?.OreDisponibili ?? 0) h</div>
+    </div>
+  </div>
+
+  @if (saldo != null)
+  {
+    <div class="chart-card" style="margin-bottom:1.5rem">
+      <div class="chart-title">Saldo ferie @DateTime.Now.Year</div>
+      <ApexChart TItem="SaldoItem" Options="opzioniDonut">
+        <ApexPointSeries TItem="SaldoItem" Items="saldoItems" Name="Ore" SeriesType="SeriesType.Donut" XValue="x => x.Label"
+                         YValue="x => (decimal)x.Valore" />
+      </ApexChart>
+    </div>
+  }
+
+  <div class="section-title">📋 Storico richieste</div>
+
+  @if (!richieste.Any())
+  {
+    <div class="empty-state">Nessuna richiesta trovata.</div>
+  }
+  else
+  {
+    <div class="table-card" style="margin-bottom:1.5rem">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Dal</th>
+            <th>Al</th>
+            <th>Ore</th>
+            <th>Stato</th>
+            <th>Note</th>
+            <th>Motivo rifiuto</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var r in richieste)
+          {
+            <tr>
+              <td><span class="badge @(r.Tipo == TipoRichiesta.Ferie ? "badge-ferie" : "badge-permesso")">@r.Tipo</span></td>
+              <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
+              <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
+              <td>@r.OreRichieste</td>
+              <td><span class="badge @GetStatoBadge(r.Stato)">@r.Stato</span></td>
+              <td>@(r.Note ?? "—")</td>
+              <td>@(r.MotivoRifiuto ?? "—")</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <div class="section-title">🕐 Storico modifiche saldo</div>
+
+  @if (!logModifiche.Any())
+  {
+    <div class="empty-state">Nessuna modifica al saldo.</div>
+  }
+  else
+  {
+    <div class="table-card">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Ore precedenti</th>
+            <th>Ore nuove</th>
+            <th>Modificato da</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var log in logModifiche)
+          {
+            <tr>
+              <td>@log.DataModifica.ToString("dd/MM/yyyy HH:mm")</td>
+              <td>@log.OrePrecedenti h</td>
+              <td>@log.OreNuove h</td>
+              <td>@log.ModificatoDa</td>
+              <td>
+                <button class="btn-edit" @onclick="() => Ripristina(log)">↩️ Ripristina</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (mostraConfermaElimina)
+{
+  <div class="modal-overlay">
+    <div class="modal">
+      <h3>Conferma eliminazione</h3>
+      <p>Sei sicuro di voler eliminare <strong>@utente?.Nome @utente?.Cognome</strong>? Verranno cancellate anche tutte le
+        sue richieste e il suo saldo ferie.</p>
+        <div class="modal-actions">
+          <button class="btn-danger" @onclick="EliminaDipendente">Elimina definitivamente</button>
+          <button class="btn-cancel" @onclick="() => mostraConfermaElimina = false">Annulla</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (!string.IsNullOrEmpty(messaggio))
+  {
+    <div class="alert @(errore ? "alert-error" : "alert-success")">@messaggio</div>
+  }
+
+@code {
+  [Parameter] public int Id { get; set; }
+
+  Utente? utente;
+  SaldoFerie? saldo;
+  List<RichiestaFerie> richieste = new();
+  List<LogModificaSaldo> logModifiche = new();
+  List<SaldoItem> saldoItems = new();
+  bool mostraConfermaElimina = false;
+  string messaggio = "";
+  bool errore = false;
+
+  ApexChartOptions<SaldoItem> opzioniDonut = new()
+  {
+    Chart = new Chart { Type = ChartType.Donut, Height = 250 },
+    Colors = new List<string> { "#F09595", "#1D9E75" }
+  };
+
+  protected override async Task OnInitializedAsync()
+  {
+    if (!Auth.IsAuthenticated || !Auth.IsCapo)
+    {
+      Nav.NavigateTo("/dashboard");
+      return;
+    }
+    await CaricaDati();
+  }
+
+  async Task CaricaDati()
+  {
+    using var db = DbFactory.CreateDbContext();
+    var anno = DateTime.Now.Year;
+
+    utente = await db.Utenti.FindAsync(Id);
+    if (utente == null) return;
+
+    saldo = await db.SaldoFerie.FirstOrDefaultAsync(s => s.UtenteId == Id && s.Anno == anno);
+
+    if (saldo != null)
+    {
+      saldoItems = new List<SaldoItem>
+            {
+                new SaldoItem { Label = "Ore usate", Valore = (double)saldo.OreUsate },
+                new SaldoItem { Label = "Ore disponibili", Valore = (double)saldo.OreDisponibili }
+            };
+    }
+
+    richieste = await db.RichiestaFerie
+        .Where(r => r.UtenteId == Id)
+        .OrderByDescending(r => r.DataRichiesta)
+        .ToListAsync();
+
+    logModifiche = await db.LogModificheSaldo
+        .Where(l => l.UtenteId == Id && l.Anno == anno)
+        .OrderByDescending(l => l.DataModifica)
+        .ToListAsync();
+  }
+
+  async Task Ripristina(LogModificaSaldo log)
+  {
+    using var db = DbFactory.CreateDbContext();
+    var anno = DateTime.Now.Year;
+    var saldoDb = await db.SaldoFerie.FirstOrDefaultAsync(s => s.UtenteId == Id && s.Anno == anno);
+
+    if (saldoDb == null) return;
+
+    db.LogModificheSaldo.Add(new LogModificaSaldo
+    {
+      UtenteId = Id,
+      OrePrecedenti = saldoDb.OreTotali,
+      OreNuove = log.OrePrecedenti,
+      DataModifica = DateTime.Now,
+      ModificatoDa = Auth.UtenteNome ?? "Capo",
+      Anno = anno
+    });
+
+    saldoDb.OreTotali = log.OrePrecedenti;
+    await db.SaveChangesAsync();
+
+    if (utente != null)
+    {
+      await EmailService.InviaAsync(
+          utente.Email,
+          $"Saldo ferie ripristinato - {anno}",
+          $"""
+                <p>Ciao {utente.Nome},</p>
+                <p>Il tuo saldo ferie per l'anno <strong>{anno}</strong> è stato ripristinato a <strong>{log.OrePrecedenti} ore</strong>.</p>
+                <p>Il team HR</p>
+                """
+      );
+    }
+
+    messaggio = $"Saldo ripristinato a {log.OrePrecedenti} ore!";
+    errore = false;
+    await CaricaDati();
+  }
+
+  async Task EliminaDipendente()
+  {
+    using var db = DbFactory.CreateDbContext();
+
+    var richiesteDip = await db.RichiestaFerie.Where(r => r.UtenteId == Id).ToListAsync();
+    db.RichiestaFerie.RemoveRange(richiesteDip);
+
+    var saldiDip = await db.SaldoFerie.Where(s => s.UtenteId == Id).ToListAsync();
+    db.SaldoFerie.RemoveRange(saldiDip);
+
+    var logDip = await db.LogModificheSaldo.Where(l => l.UtenteId == Id).ToListAsync();
+    db.LogModificheSaldo.RemoveRange(logDip);
+
+    var utenteDip = await db.Utenti.FindAsync(Id);
+    if (utenteDip != null) db.Utenti.Remove(utenteDip);
+
+    await db.SaveChangesAsync();
+    Nav.NavigateTo("/dipendenti");
+  }
+
+  string GetStatoBadge(StatoRichiesta stato) => stato switch
+  {
+    StatoRichiesta.Approvata => "badge-success",
+    StatoRichiesta.Rifiutata => "badge-danger",
+    _ => "badge-warning"
+  };
+
+  record SaldoItem(string Label = "", double Valore = 0);
+}

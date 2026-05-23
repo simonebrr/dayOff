@@ -1,0 +1,95 @@
+is_global = true
+build_property.TargetFramework = net10.0
+build_property.TargetFramework = net10.0
+build_property.TargetPlatformMinVersion = 
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.ProjectTypeGuids = 
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property.TargetFrameworkIdentifier = .NETCoreApp
+build_property.TargetFrameworkVersion = v10.0
+build_property.RootNamespace = GestioneFerie.Web
+build_property.RootNamespace = GestioneFerie.Web
+build_property.ProjectDir = /home/simo/Desktop/GestioneFerie/GestioneFerie.Web/
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.RazorLangVersion = 9.0
+build_property.SupportLocalizedComponentNames = 
+build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+build_property.MSBuildProjectDirectory = /home/simo/Desktop/GestioneFerie/GestioneFerie.Web
+build_property._RazorSourceGeneratorDebug = 
+build_property.EffectiveAnalysisLevelStyle = 10.0
+build_property.EnableCodeStyleSeverity = 
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/App.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9BcHAucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/Logout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9Mb2dvdXQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Routes.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9Sb3V0ZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/_Imports.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9fSW1wb3J0cy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Layout/MainLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9MYXlvdXQvTWFpbkxheW91dC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = b-u3f8cddbds
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Layout/NavMenu.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9MYXlvdXQvTmF2TWVudS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = b-p7lhkitg9e
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Layout/ReconnectModal.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9MYXlvdXQvUmVjb25uZWN0TW9kYWwucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = b-9go4n96jrt
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/Calendario.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9DYWxlbmRhcmlvLnJhem9y
+build_metadata.AdditionalFiles.CssScope = b-hi1sja2a68
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/Dashboard.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9EYXNoYm9hcmQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = b-i5gom2pf3k
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/DettaglioDipendente.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9EZXR0YWdsaW9EaXBlbmRlbnRlLnJhem9y
+build_metadata.AdditionalFiles.CssScope = b-axg4u0lssv
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/Dipendenti.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9EaXBlbmRlbnRpLnJhem9y
+build_metadata.AdditionalFiles.CssScope = b-9geqemkt2c
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/Login.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9Mb2dpbi5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = b-m9961qckkd
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/MieRichieste.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9NaWVSaWNoaWVzdGUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = b-kk1im59twx
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/NuovaRichiesta.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9OdW92YVJpY2hpZXN0YS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = b-s5yjfrtlzk
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/Profilo.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9Qcm9maWxvLnJhem9y
+build_metadata.AdditionalFiles.CssScope = b-wsa2t94zv3
+
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/Richieste.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9SaWNoaWVzdGUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = b-eatt058rhv

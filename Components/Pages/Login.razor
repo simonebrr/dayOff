@@ -1,0 +1,69 @@
+@page "/login"
+@inject AuthService Auth
+@inject NavigationManager Nav
+@using GestioneFerie.Web.Services
+@rendermode InteractiveServer
+
+<PageTitle>Login</PageTitle>
+
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-header">
+      <h1>🗓️ Gestione Ferie</h1>
+      <p>Accedi al tuo account</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errore))
+    {
+      <div class="alert-error">@errore</div>
+    }
+
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" @bind="email" placeholder="tuaemail@azienda.it" />
+    </div>
+
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" @bind="password" placeholder="••••••••" />
+    </div>
+
+    <button class="btn-login" @onclick="Accedi" disabled="@caricamento">
+      @if (caricamento)
+      {
+        <span>Accesso in corso...</span>
+      }
+      else
+      {
+
+        <span>Accedi</span>
+      }
+    </button>
+  </div>
+</div>
+
+@code {
+  string email = "";
+  string password = "";
+  string errore = "";
+  bool caricamento = false;
+
+  async Task Accedi()
+  {
+    caricamento = true;
+    errore = "";
+    StateHasChanged();
+
+    var (successo, messaggio) = await Auth.LoginAsync(email, password);
+
+    if (successo)
+    {
+      Nav.NavigateTo("/dashboard", forceLoad: true);
+    }
+    else
+    {
+      errore = messaggio;
+      caricamento = false;
+    }
+  }
+}

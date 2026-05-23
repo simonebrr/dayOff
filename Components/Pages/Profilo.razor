@@ -1,0 +1,117 @@
+@page "/profilo"
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject AuthService Auth
+@inject NavigationManager Nav
+@using GestioneFerie.Web.Services
+@using GestioneFerie.Web.Models
+@using GestioneFerie.Web.Data
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+
+<PageTitle>Profilo</PageTitle>
+
+<div class="page-header">
+  <h2>Il mio profilo</h2>
+  <p class="subtitle">Gestisci i tuoi dati personali</p>
+</div>
+
+@if (!string.IsNullOrEmpty(messaggio))
+{
+  <div class="alert @(errore ? "alert-error" : "alert-success")">@messaggio</div>
+}
+
+<div class="grid-2">
+  <div class="form-card">
+    <h3>Informazioni personali</h3>
+    <div class="info-row">
+      <span class="info-label">Nome</span>
+      <span class="info-value">@utente?.Nome @utente?.Cognome</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Email</span>
+      <span class="info-value">@utente?.Email</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Ruolo</span>
+      <span class="role-badge @(Auth.IsCapo ? "badge-capo" : "badge-dipendente")">
+        @(Auth.IsCapo ? "Capo" : "Dipendente")
+      </span>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <h3>Cambia password</h3>
+    <div class="form-group">
+      <label>Password attuale</label>
+      <input type="password" @bind="vecchiaPassword" placeholder="••••••••" />
+    </div>
+    <div class="form-group">
+      <label>Nuova password</label>
+      <input type="password" @bind="nuovaPassword" placeholder="••••••••" />
+    </div>
+    <div class="form-group">
+      <label>Conferma nuova password</label>
+      <input type="password" @bind="confermaPassword" placeholder="••••••••" />
+    </div>
+    <button class="btn-primary" @onclick="CambiaPassword">Aggiorna password</button>
+  </div>
+</div>
+
+@code {
+
+  Utente? utente;
+  string messaggio = "";
+  bool errore = false;
+  string vecchiaPassword = "";
+  string nuovaPassword = "";
+  string confermaPassword = "";
+  protected override async Task OnInitializedAsync()
+  {
+    if (!Auth.IsAuthenticated)
+    {
+      Nav.NavigateTo("/login");
+      return;
+    }
+    await CaricaUtente();
+  }
+
+  async Task CaricaUtente()
+  {
+    using var db = DbFactory.CreateDbContext();
+    utente = await db.Utenti.FindAsync(Auth.UtenteId);
+  }
+
+  async Task CambiaPassword()
+  {
+    if (string.IsNullOrWhiteSpace(vecchiaPassword) || string.IsNullOrWhiteSpace(nuovaPassword))
+    {
+      messaggio = "Compila tutti i campi";
+      errore = true;
+      return;
+    }
+    if (nuovaPassword.Length < 6)
+    {
+      messaggio = "La nuova password deve essere di almeno 6 caratteri.";
+      errore = true;
+      return;
+    }
+
+    using var db = DbFactory.CreateDbContext();
+    var UtenteDb = await db.Utenti.FindAsync(Auth.UtenteId);
+    if (UtenteDb == null) return;
+
+    if (!BCrypt.Net.BCrypt.Verify(vecchiaPassword, UtenteDb.PasswordHash))
+    {
+      messaggio = "La password attuale non è corretta.";
+      errore = true;
+      return;
+    }
+
+    UtenteDb.PasswordHash = BCrypt.Net.BCrypt.HashPassword(nuovaPassword);
+    await db.SaveChangesAsync();
+
+    messaggio = "Password aggiornata con successo!";
+    errore = false;
+    vecchiaPassword = nuovaPassword = confermaPassword = "";
+  }
+}
