@@ -1,0 +1,12 @@
+@page "/esci"
+@inject AuthService Auth
+@inject NavigationManager Nav
+@using GestioneFerie.Web.Services
+
+@code {
+  protected override void OnInitialized()
+  {
+    Auth.Logout();
+    Nav.NavigateTo("/login", forceLoad: true);
+  }
+}

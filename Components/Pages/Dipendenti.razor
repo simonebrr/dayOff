@@ -1,0 +1,488 @@
+@page "/dipendenti"
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject EmailService EmailService
+@using GestioneFerie.Web.Services
+@using GestioneFerie.Web.Models
+@using GestioneFerie.Web.Data
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+
+<PageTitle>Dipendenti</PageTitle>
+
+<div class="page-header">
+  <div>
+    <h2>Gestione dipendenti</h2>
+    <p class="subtitle">Aggiungi dipendenti e gestisci i loro saldi ferie</p>
+  </div>
+  <div class="header-actions">
+    @if (!modificaMassiva)
+    {
+      <button class="btn-secondary" @onclick="AttivaModificaMassiva">✏️ Modifica tutti</button>
+      <button class="btn-secondary" @onclick="() => mostraModalAssegnaTutti = true">📋 Assegna a tutti</button>
+    }
+    else
+    {
+      <button class="btn-primary" @onclick="SalvaTutti">💾 Salva tutto</button>
+      <button class="btn-cancel" @onclick="AnnullaModificaMassiva">Annulla</button>
+    }
+    <button class="btn-primary" @onclick="() => mostraModalNuovo = true">+ Nuovo dipendente</button>
+  </div>
+</div>
+
+@if (!string.IsNullOrEmpty(messaggio))
+{
+  <div class="alert @(errore ? "alert-error" : "alert-success")">@messaggio</div>
+}
+
+@if (!dipendenti.Any())
+{
+  <div class="empty-state">Nessun dipendente ancora. Aggiungine uno! 👆</div>
+}
+else
+{
+  <div class="table-card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Email</th>
+          <th>Ore totali @DateTime.Now.Year</th>
+          <th>Ore usate</th>
+          <th>Ore disponibili</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var d in dipendenti)
+        {
+          <tr>
+            <td>
+              <a href="/dipendente/@d.Utente.Id" class="link-nome">
+                @d.Utente.Nome @d.Utente.Cognome
+              </a>
+            </td>
+            <td>@d.Utente.Email</td>
+            <td>
+              @if (modificaMassiva || modificaSaldoId == d.Utente.Id)
+              {
+                <input type="number" min="0" style="width:80px" value="@GetOreTotaliModifica(d.Utente.Id)"
+                       @onchange="e => SetOreTotaliModifica(d.Utente.Id, e)" />
+              }
+              else
+              {
+                @(d.Saldo?.OreTotali.ToString() ?? "—")
+              }
+            </td>
+            <td>@(d.Saldo?.OreUsate.ToString() ?? "—")</td>
+            <td>
+              <span class="@(d.Saldo != null && d.Saldo.OreDisponibili < 16 ? "text-danger" : "text-success")">
+                @(d.Saldo?.OreDisponibili.ToString() ?? "—")
+              </span>
+            </td>
+            <td>
+              @if (!modificaMassiva)
+              {
+                @if (modificaSaldoId == d.Utente.Id)
+                {
+                  <button class="btn-approve" @onclick="() => SalvaSaldo(d.Utente.Id)">✅ Salva</button>
+                  <button class="btn-cancel" @onclick="AnnullaModifica">Annulla</button>
+                }
+                else
+                {
+                  <button class="btn-edit" @onclick="() => ApriModificaSaldo(d.Utente.Id, d.Saldo?.OreTotali ?? 0)">✏️ Saldo</button>
+                }
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (mostraModalNuovo)
+{
+  <div class="modal-overlay">
+    <div class="modal">
+      <h3>Nuovo dipendente</h3>
+      <div class="form-group">
+        <label>Nome</label>
+        <input type="text" @bind="nuovoNome" placeholder="Mario" />
+      </div>
+      <div class="form-group">
+        <label>Cognome</label>
+        <input type="text" @bind="nuovoCognome" placeholder="Rossi" />
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" @bind="nuovaEmail" placeholder="mario.rossi@azienda.it" />
+      </div>
+      <div class="form-group">
+        <label>Ore ferie anno @DateTime.Now.Year</label>
+        <input type="number" @bind="nuoveOre" min="0" placeholder="Es. 160" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" @onclick="AggiungiDipendente">Aggiungi</button>
+        <button class="btn-cancel" @onclick="() => mostraModalNuovo = false">Annulla</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (mostraModalAssegnaTutti)
+{
+  <div class="modal-overlay">
+    <div class="modal">
+      <h3>Assegna ore a tutti i dipendenti</h3>
+      <p class="modal-subtitle">Sovrascrive il saldo ferie di tutti i dipendenti per l'anno @DateTime.Now.Year</p>
+      <div class="form-group">
+        <label>Ore totali ferie</label>
+        <input type="number" @bind="oreAssegnaTutti" min="0" placeholder="Es. 160" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" @onclick="AssegnaTutti">Assegna a tutti</button>
+        <button class="btn-cancel" @onclick="() => mostraModalAssegnaTutti = false">Annulla</button>
+      </div>
+    </div>
+  </div>
+}
+
+@code {
+  record DipendenteViewModel(Utente Utente, SaldoFerie? Saldo);
+
+  List<DipendenteViewModel> dipendenti = new();
+  bool mostraModalNuovo = false;
+  bool mostraModalAssegnaTutti = false;
+  bool modificaMassiva = false;
+  string messaggio = "";
+  bool errore = false;
+
+  string nuovoNome = "";
+  string nuovoCognome = "";
+  string nuovaEmail = "";
+  string nuovaPassword = "";
+  decimal nuoveOre = 160;
+  decimal oreAssegnaTutti = 160;
+
+  int modificaSaldoId = 0;
+  decimal oreTotaliModifica = 0;
+  Dictionary<int, decimal> modificheMassive = new();
+
+  protected override async Task OnInitializedAsync()
+  {
+    if (!Auth.IsAuthenticated || !Auth.IsCapo)
+    {
+      Nav.NavigateTo("/dashboard");
+      return;
+    }
+    await CaricaDipendenti();
+  }
+
+  async Task CaricaDipendenti()
+  {
+    using var db = DbFactory.CreateDbContext();
+    var anno = DateTime.Now.Year;
+    var utenti = await db.Utenti
+        .Where(u => u.Ruolo == Ruolo.Dipendente)
+        .ToListAsync();
+
+    var utenteIds = utenti.Select(u => u.Id).ToList();
+    var saldi = await db.SaldoFerie
+        .Where(s => s.Anno == anno && utenteIds.Contains(s.UtenteId))
+        .ToListAsync();
+
+    dipendenti = utenti.Select(u => new DipendenteViewModel(
+        u,
+        saldi.FirstOrDefault(s => s.UtenteId == u.Id)
+    )).ToList();
+  }
+
+  void AttivaModificaMassiva()
+  {
+    modificheMassive = dipendenti.ToDictionary(
+        d => d.Utente.Id,
+        d => d.Saldo?.OreTotali ?? 0
+    );
+    modificaMassiva = true;
+  }
+
+  void AnnullaModificaMassiva()
+  {
+    modificheMassive.Clear();
+    modificaMassiva = false;
+  }
+
+  decimal GetOreTotaliModifica(int utenteId)
+  {
+    if (modificaMassiva && modificheMassive.TryGetValue(utenteId, out var ore))
+      return ore;
+    return oreTotaliModifica;
+  }
+
+  void SetOreTotaliModifica(int utenteId, ChangeEventArgs e)
+  {
+    if (decimal.TryParse(e.Value?.ToString(), out var ore))
+    {
+      if (modificaMassiva)
+        modificheMassive[utenteId] = ore;
+      else
+        oreTotaliModifica = ore;
+    }
+  }
+
+  async Task SalvaTutti()
+  {
+    using var db = DbFactory.CreateDbContext();
+    var anno = DateTime.Now.Year;
+    var utenteIds = modificheMassive.Keys.ToList();
+
+    var saldi = await db.SaldoFerie
+        .Where(s => s.Anno == anno && utenteIds.Contains(s.UtenteId))
+        .ToListAsync();
+
+    var utenti = await db.Utenti
+        .Where(u => utenteIds.Contains(u.Id))
+        .ToListAsync();
+
+    foreach (var (utenteId, oreTotali) in modificheMassive)
+    {
+      var saldo = saldi.FirstOrDefault(s => s.UtenteId == utenteId);
+      await SalvaLog(db, utenteId, saldo?.OreTotali ?? 0, oreTotali);
+
+      if (saldo == null)
+      {
+        db.SaldoFerie.Add(new SaldoFerie
+        {
+          UtenteId = utenteId,
+          OreTotali = oreTotali,
+          OreUsate = 0,
+          Anno = anno
+        });
+      }
+      else
+      {
+        saldo.OreTotali = oreTotali;
+      }
+    }
+
+    await db.SaveChangesAsync();
+
+    var snapshot = utenti
+        .Where(u => !string.IsNullOrWhiteSpace(u.Email))
+        .Select(u => (u.Email, u.Nome, Ore: modificheMassive[u.Id]))
+        .ToList();
+
+    var emailTasks = snapshot.Select(u => EmailService.InviaAsync(
+        u.Email,
+        $"Saldo ferie aggiornato - {anno}",
+        $"""
+        <p>Ciao {u.Nome},</p>
+        <p>Il tuo saldo ferie per l'anno <strong>{anno}</strong> è stato aggiornato:</p>
+        <p>Ore totali: <strong>{u.Ore}</strong></p>
+        <p>Il team HR</p>
+        """
+    ));
+    await Task.WhenAll(emailTasks);
+
+    modificaMassiva = false;
+    modificheMassive.Clear();
+    messaggio = "Saldi aggiornati! Email inviate ai dipendenti.";
+    errore = false;
+    await CaricaDipendenti();
+    await InvokeAsync(StateHasChanged);
+  }
+
+  void ApriModificaSaldo(int utenteId, decimal oreAttuali)
+  {
+    modificaSaldoId = utenteId;
+    oreTotaliModifica = oreAttuali;
+  }
+
+  void AnnullaModifica() => modificaSaldoId = 0;
+
+  async Task SalvaLog(AppDbContext db, int utenteId, decimal orePrecedenti, decimal oreNuove)
+  {
+    db.LogModificheSaldo.Add(new LogModificaSaldo
+    {
+      UtenteId = utenteId,
+      OrePrecedenti = orePrecedenti,
+      OreNuove = oreNuove,
+      DataModifica = DateTime.Now,
+      ModificatoDa = Auth.UtenteNome ?? "Capo",
+      Anno = DateTime.Now.Year
+    });
+  }
+
+  async Task SalvaSaldo(int utenteId)
+  {
+    using var db = DbFactory.CreateDbContext();
+    var anno = DateTime.Now.Year;
+    var saldo = await db.SaldoFerie.FirstOrDefaultAsync(s => s.UtenteId == utenteId && s.Anno == anno);
+    var utente = await db.Utenti.FindAsync(utenteId);
+
+    await SalvaLog(db, utenteId, saldo?.OreTotali ?? 0, oreTotaliModifica);
+
+    if (saldo == null)
+    {
+      db.SaldoFerie.Add(new SaldoFerie
+      {
+        UtenteId = utenteId,
+        OreTotali = oreTotaliModifica,
+        OreUsate = 0,
+        Anno = anno
+      });
+    }
+    else
+    {
+      saldo.OreTotali = oreTotaliModifica;
+    }
+
+    await db.SaveChangesAsync();
+
+    if (utente != null && !string.IsNullOrWhiteSpace(utente.Email))
+    {
+      await EmailService.InviaAsync(
+          utente.Email,
+          $"Saldo ferie aggiornato - {anno}",
+          $"""
+          <p>Ciao {utente.Nome},</p>
+          <p>Il tuo saldo ferie per l'anno <strong>{anno}</strong> è stato aggiornato:</p>
+          <p>Ore totali: <strong>{oreTotaliModifica}</strong></p>
+          <p>Il team HR</p>
+          """
+      );
+    }
+
+    modificaSaldoId = 0;
+    messaggio = "Saldo aggiornato! Email inviata al dipendente.";
+    errore = false;
+    await CaricaDipendenti();
+  }
+
+  async Task AssegnaTutti()
+  {
+    using var db = DbFactory.CreateDbContext();
+    var anno = DateTime.Now.Year;
+    var utenteIds = dipendenti.Select(d => d.Utente.Id).ToList();
+
+    var saldi = await db.SaldoFerie
+        .Where(s => s.Anno == anno && utenteIds.Contains(s.UtenteId))
+        .ToListAsync();
+
+    foreach (var d in dipendenti)
+    {
+      var saldo = saldi.FirstOrDefault(s => s.UtenteId == d.Utente.Id);
+      await SalvaLog(db, d.Utente.Id, saldo?.OreTotali ?? 0, oreAssegnaTutti);
+
+      if (saldo == null)
+        db.SaldoFerie.Add(new SaldoFerie { UtenteId = d.Utente.Id, OreTotali = oreAssegnaTutti, OreUsate = 0, Anno = anno });
+      else
+        saldo.OreTotali = oreAssegnaTutti;
+    }
+
+    await db.SaveChangesAsync();
+
+    // snapshot PRIMA di resettare e ricaricare
+    var oreSnapshot = oreAssegnaTutti;
+    var dipendentiSnapshot = dipendenti
+        .Where(d => !string.IsNullOrWhiteSpace(d.Utente.Email))
+        .Select(d => (d.Utente.Email, d.Utente.Nome))
+        .ToList();
+
+    mostraModalAssegnaTutti = false;
+    messaggio = $"Assegnate {oreSnapshot} ore a tutti i dipendenti!";
+    errore = false;
+    await CaricaDipendenti();
+    await InvokeAsync(StateHasChanged);
+
+    _ = Task.Run(async () =>
+    {
+      var tasks = dipendentiSnapshot.Select(d => EmailService.InviaAsync(
+          d.Email,
+          $"Saldo ferie aggiornato - {anno}",
+          $"""
+          <p>Ciao {d.Nome},</p>
+          <p>Il tuo saldo ferie per l'anno <strong>{anno}</strong>
+             è stato aggiornato a <strong>{oreSnapshot} ore</strong>.</p>
+          <p>Il team HR</p>
+          """
+      ));
+      await Task.WhenAll(tasks);
+    });
+  }
+
+  async Task AggiungiDipendente()
+  {
+    if (string.IsNullOrWhiteSpace(nuovoNome) || string.IsNullOrWhiteSpace(nuovaEmail))
+    {
+      messaggio = "Compila tutti i campi obbligatori.";
+      errore = true;
+      return;
+    }
+
+    using var db = DbFactory.CreateDbContext();
+
+    if (await db.Utenti.AnyAsync(u => u.Email == nuovaEmail))
+    {
+      messaggio = "Email già in uso.";
+      errore = true;
+      return;
+    }
+
+    var passwordRandom = GeneraPassword();
+
+    var utente = new Utente
+    {
+      Nome = nuovoNome,
+      Cognome = nuovoCognome,
+      Email = nuovaEmail,
+      PasswordHash = BCrypt.Net.BCrypt.HashPassword(passwordRandom),
+      Ruolo = Ruolo.Dipendente
+    };
+    db.Utenti.Add(utente);
+    await db.SaveChangesAsync();
+
+    db.SaldoFerie.Add(new SaldoFerie
+    {
+      UtenteId = utente.Id,
+      OreTotali = nuoveOre,
+      OreUsate = 0,
+      Anno = DateTime.Now.Year
+    });
+    await db.SaveChangesAsync();
+
+    // snapshot PRIMA di resettare i campi
+    var emailSnapshot = nuovaEmail;
+    var nomeSnapshot = nuovoNome;
+
+    messaggio = $"Dipendente {nuovoNome} {nuovoCognome} aggiunto! Email con credenziali inviata.";
+    errore = false;
+    mostraModalNuovo = false;
+    nuovoNome = nuovoCognome = nuovaEmail = nuovaPassword = "";
+    nuoveOre = 160;
+
+    _ = Task.Run(() => EmailService.InviaAsync(
+        emailSnapshot,
+        "Benvenuto! Le tue credenziali di accesso",
+        $"""
+        <p>Ciao {nomeSnapshot},</p>
+        <p>Il tuo account è stato creato. Ecco le tue credenziali:</p>
+        <p>Email: <strong>{emailSnapshot}</strong></p>
+        <p>Password: <strong>{passwordRandom}</strong></p>
+        <p>Ti consigliamo di cambiare la password al primo accesso.</p>
+        <p>Il team HR</p>
+        """
+    ));
+
+    await CaricaDipendenti();
+  }
+
+  string GeneraPassword()
+  {
+    const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
+    var random = new Random();
+    return new string(Enumerable.Range(0, 12).Select(_ => chars[random.Next(chars.Length)]).ToArray());
+  }
+}

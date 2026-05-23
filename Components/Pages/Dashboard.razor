@@ -1,0 +1,486 @@
+@page "/dashboard"
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject EmailService EmailService
+@using GestioneFerie.Web.Services
+@using GestioneFerie.Web.Models
+@using GestioneFerie.Web.Data
+@using Microsoft.EntityFrameworkCore
+@using ApexCharts
+
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard</PageTitle>
+
+@if (Auth.IsCapo)
+{
+  <div class="dashboard-header">
+    <div>
+      <h2>Buongiorno, @Auth.UtenteNome 👋</h2>
+      <p class="subtitle">Pannello di controllo ferie aziendali</p>
+    </div>
+  </div>
+
+  <div class="grid-4">
+    <div class="metric-card">
+      <div class="metric-label">👥 Dipendenti</div>
+      <div class="metric-value">@totaleDipendenti</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">⏳ Richieste in attesa</div>
+      <div class="metric-value warning">@richiesteInAttesa</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">✅ Approvate questo mese</div>
+      <div class="metric-value success">@richiesteApprovate</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">❌ Rifiutate questo mese</div>
+      <div class="metric-value danger">@richiesteRifiutate</div>
+    </div>
+  </div>
+
+  <div class="section-title">Richieste in attesa di approvazione</div>
+
+  @if (!richiesteAttesa.Any())
+  {
+    <div class="empty-state">Nessuna richiesta in attesa 🎉</div>
+  }
+  else
+  {
+    <div class="table-card">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Dipendente</th>
+            <th>Tipo</th>
+            <th>Dal</th>
+            <th>Al</th>
+            <th>Ore</th>
+            <th>Note</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var r in richiesteAttesa)
+          {
+            <tr>
+              <td>@r.Utente.Nome @r.Utente.Cognome</td>
+              <td><span class="badge @(r.Tipo == TipoRichiesta.Ferie ? "badge-ferie" : "badge-permesso")">@r.Tipo</span></td>
+              <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
+              <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
+              <td>@r.OreRichieste</td>
+              <td>@(r.Note ?? "-")</td>
+              <td>
+                <button class="btn-approve" @onclick="() => Approva(r.Id)">✅ Approva</button>
+                <button class="btn-reject" @onclick="() => ApriRifiuto(r.Id)">❌ Rifiuta</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (inFerieOggi.Any())
+  {
+    <div class="section-title">🏖️ In ferie oggi</div>
+    <div class="chips-row">
+      @foreach (var r in inFerieOggi)
+      {
+        <div class="chip chip-ferie">@r.Utente.Nome @r.Utente.Cognome</div>
+      }
+    </div>
+  }
+
+  @if (pocheOre.Any())
+  {
+    <div class="section-title">⚠️ Dipendenti con poche ore rimaste</div>
+    <div class="chips-row">
+      @foreach (var s in pocheOre)
+      {
+        <div class="chip chip-warning">@s.Utente.Nome @s.Utente.Cognome — @s.OreDisponibili h</div>
+      }
+    </div>
+  }
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Top 5 dipendenti con meno ore rimaste</div>
+      @if (graficiVisibili && oreDipendenti.Any())
+      {
+        <ApexChart TItem="OreDipendente" Options="opzioniBar">
+          <ApexPointSeries TItem="OreDipendente" Items="oreDipendenti" Name="Ore usate" SeriesType="SeriesType.Bar"
+                           XValue="x => x.Nome" YValue="x => (decimal)x.OreUsate" />
+          <ApexPointSeries TItem="OreDipendente" Items="oreDipendenti" Name="Ore disponibili" SeriesType="SeriesType.Bar"
+                           XValue="x => x.Nome" YValue="x => (decimal)x.OreDisponibili" />
+        </ApexChart>
+      }
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Richieste per mese</div>
+      @if (graficiVisibili && richiestePerMese.Any())
+      {
+        <ApexChart TItem="RichiestaMese" Options="opzioniLinea">
+          <ApexPointSeries TItem="RichiestaMese" Items="richiestePerMese" Name="Richieste" SeriesType="SeriesType.Line"
+                           XValue="x => x.Mese" YValue="x => x.Conteggio" />
+        </ApexChart>
+      }
+    </div>
+  </div>
+
+  @if (mostraModalRifiuto)
+  {
+    <div class="modal-overlay">
+      <div class="modal">
+        <h3>Motivo del rifiuto</h3>
+        <textarea @bind="motivoRifiuto" placeholder="Inserisci il motivo..."></textarea>
+        <div class="modal-actions">
+          <button class="btn-reject" @onclick="ConfermaRifiuto">Conferma rifiuto</button>
+          <button class="btn-cancel" @onclick="() => mostraModalRifiuto = false">Annulla</button>
+        </div>
+      </div>
+    </div>
+  }
+}
+else
+{
+  <div class="dashboard-header">
+    <div>
+      <h2>Bentornato, @Auth.UtenteNome 👋</h2>
+      <p class="subtitle">Il tuo saldo ferie</p>
+    </div>
+    <a href="/nuova-richiesta" class="btn-primary">+ Nuova richiesta</a>
+  </div>
+
+  <div class="grid-3">
+    <div class="metric-card">
+      <div class="metric-label">📅 Ore totali</div>
+      <div class="metric-value">@saldo?.OreTotali h</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">✅ Ore usate</div>
+      <div class="metric-value warning">@saldo?.OreUsate h</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">🟢 Ore disponibili</div>
+      <div class="metric-value success">@saldo?.OreDisponibili h</div>
+    </div>
+  </div>
+
+  @if (saldo != null)
+  {
+    <div class="chart-card" style="margin-bottom:1.5rem">
+      <div class="chart-title">Il mio saldo ferie @DateTime.Now.Year</div>
+      @if (graficiVisibili)
+      {
+        <ApexChart TItem="SaldoItem" Options="opzioniDonut">
+          <ApexPointSeries TItem="SaldoItem" Items="saldoItems" Name="Ore" SeriesType="SeriesType.Donut" XValue="x => x.Label"
+                           YValue="x => (decimal)x.Valore" />
+        </ApexChart>
+      }
+    </div>
+  }
+
+  <div class="section-title">Le mie ultime richieste</div>
+
+  @if (!mieRichieste.Any())
+  {
+    <div class="empty-state">Non hai ancora fatto richieste</div>
+  }
+  else
+  {
+    <div class="table-card">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Dal</th>
+            <th>Al</th>
+            <th>Ore</th>
+            <th>Stato</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var r in mieRichieste)
+          {
+            <tr>
+              <td><span class="badge @(r.Tipo == TipoRichiesta.Ferie ? "badge-ferie" : "badge-permesso")">@r.Tipo</span></td>
+              <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
+              <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
+              <td>@r.OreRichieste</td>
+              <td><span class="badge @GetStatoBadge(r.Stato)">@r.Stato</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@code {
+  // capo
+  int totaleDipendenti;
+  int richiesteInAttesa;
+  int richiesteApprovate;
+  int richiesteRifiutate;
+  List<RichiestaFerie> richiesteAttesa = new();
+  List<RichiestaFerie> inFerieOggi = new();
+  List<SaldoFerie> pocheOre = new();
+  List<OreDipendente> oreDipendenti = new();
+  List<RichiestaMese> richiestePerMese = new();
+  bool mostraModalRifiuto = false;
+  string motivoRifiuto = "";
+  int richiestaRifiutoId;
+  bool graficiVisibili = true;
+
+  // dipendente
+  SaldoFerie? saldo;
+  List<RichiestaFerie> mieRichieste = new();
+  List<SaldoItem> saldoItems = new();
+
+  ApexChartOptions<OreDipendente> opzioniBar = new()
+  {
+    Chart = new Chart { Type = ChartType.Bar, Height = 300, Toolbar = new Toolbar { Show = false } },
+    PlotOptions = new PlotOptions { Bar = new PlotOptionsBar { Horizontal = true } },
+    Legend = new Legend { Show = true }
+  };
+
+  ApexChartOptions<RichiestaMese> opzioniLinea = new()
+  {
+    Chart = new Chart { Type = ChartType.Line, Height = 250, Toolbar = new Toolbar { Show = false } },
+    Stroke = new Stroke { Curve = Curve.Smooth, Width = new List<int> { 3 } }
+  };
+
+  ApexChartOptions<SaldoItem> opzioniDonut = new()
+  {
+    Chart = new Chart { Type = ChartType.Donut, Height = 250 },
+    Colors = new List<string> { "#F09595", "#1D9E75" }
+  };
+
+  protected override async Task OnInitializedAsync()
+  {
+    if (!Auth.IsAuthenticated)
+    {
+      Nav.NavigateTo("/login");
+      return;
+    }
+    await CaricaDati();
+  }
+
+  async Task CaricaDati()
+  {
+    graficiVisibili = false;
+    await InvokeAsync(StateHasChanged);
+
+    using var db = DbFactory.CreateDbContext();
+    var ora = DateTime.Now;
+    var oggi = DateTime.Today;
+
+    if (Auth.IsCapo)
+    {
+      totaleDipendenti = await db.Utenti.CountAsync(u => u.Ruolo == Ruolo.Dipendente);
+      richiesteInAttesa = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.InAttesa);
+      richiesteApprovate = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.Approvata &&
+        r.DataRichiesta.Month == ora.Month);
+      richiesteRifiutate = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.Rifiutata &&
+        r.DataRichiesta.Month == ora.Month);
+
+      richiesteAttesa = await db.RichiestaFerie
+          .Include(r => r.Utente)
+          .Where(r => r.Stato == StatoRichiesta.InAttesa)
+          .OrderBy(r => r.DataRichiesta)
+          .ToListAsync();
+
+      inFerieOggi = await db.RichiestaFerie
+          .Include(r => r.Utente)
+          .Where(r => r.Stato == StatoRichiesta.Approvata
+              && r.DataInizio <= oggi && r.DataFine >= oggi)
+          .ToListAsync();
+
+      var saldi = await db.SaldoFerie
+          .Include(s => s.Utente)
+          .Where(s => s.Anno == ora.Year)
+          .ToListAsync();
+
+      pocheOre = saldi.Where(s => s.OreDisponibili < 16).ToList();
+
+      oreDipendenti = saldi
+          .OrderBy(s => s.OreDisponibili)
+          .Take(5)
+          .Select(s => new OreDipendente
+          {
+            Nome = s.Utente.Nome,
+            OreUsate = (double)s.OreUsate,
+            OreDisponibili = (double)s.OreDisponibili
+          }).ToList();
+
+      var richiesteMese = await db.RichiestaFerie
+          .Where(r => r.DataRichiesta.Year == ora.Year)
+          .ToListAsync();
+
+      richiestePerMese = richiesteMese
+          .GroupBy(r => r.DataRichiesta.Month)
+          .OrderBy(g => g.Key)
+          .Select(g => new RichiestaMese
+          {
+            Mese = new DateTime(ora.Year, g.Key, 1).ToString("MMM"),
+            Conteggio = g.Count()
+          }).ToList();
+    }
+    else
+    {
+      saldo = await db.SaldoFerie.FirstOrDefaultAsync(s => s.UtenteId == Auth.UtenteId && s.Anno == ora.Year);
+
+      if (saldo != null)
+      {
+        saldoItems = new List<SaldoItem>
+        {
+          new SaldoItem { Label = "Ore usate", Valore = (double)saldo.OreUsate },
+          new SaldoItem { Label = "Ore disponibili", Valore = (double)saldo.OreDisponibili }
+        };
+      }
+
+      mieRichieste = await db.RichiestaFerie
+          .Where(r => r.UtenteId == Auth.UtenteId)
+          .OrderByDescending(r => r.DataRichiesta)
+          .Take(10)
+          .ToListAsync();
+    }
+
+    graficiVisibili = true;
+    await InvokeAsync(StateHasChanged);
+  }
+
+  async Task AggiornaGrafici()
+  {
+    graficiVisibili = false;
+    await InvokeAsync(StateHasChanged);
+    await Task.Delay(50); // ← da tempo a Blazor di fare il render senza grafici
+
+    using var db = DbFactory.CreateDbContext();
+    var ora = DateTime.Now;
+
+    var saldi = await db.SaldoFerie
+        .Include(s => s.Utente)
+        .Where(s => s.Anno == ora.Year)
+        .ToListAsync();
+
+    oreDipendenti = saldi
+        .OrderBy(s => s.OreDisponibili)
+        .Take(5)
+        .Select(s => new OreDipendente
+        {
+          Nome = s.Utente.Nome,
+          OreUsate = (double)s.OreUsate,
+          OreDisponibili = (double)s.OreDisponibili
+        }).ToList();
+
+    var richiesteMese = await db.RichiestaFerie
+        .Where(r => r.DataRichiesta.Year == ora.Year)
+        .ToListAsync();
+
+    richiestePerMese = richiesteMese
+        .GroupBy(r => r.DataRichiesta.Month)
+        .OrderBy(g => g.Key)
+        .Select(g => new RichiestaMese
+        {
+          Mese = new DateTime(ora.Year, g.Key, 1).ToString("MMM"),
+          Conteggio = g.Count()
+        }).ToList();
+
+    graficiVisibili = true;
+    await InvokeAsync(StateHasChanged);
+  }
+
+  async Task Approva(int id)
+  {
+    using var db = DbFactory.CreateDbContext();
+    var richiesta = await db.RichiestaFerie.Include(r => r.Utente).FirstOrDefaultAsync(r => r.Id == id);
+    if (richiesta == null) return;
+
+    richiesta.Stato = StatoRichiesta.Approvata;
+    var saldoDip = await db.SaldoFerie.FirstOrDefaultAsync(s => s.UtenteId == richiesta.UtenteId && s.Anno ==
+DateTime.Now.Year);
+    if (saldoDip != null) saldoDip.OreUsate += richiesta.OreRichieste;
+    await db.SaveChangesAsync();
+
+    richiesteAttesa.RemoveAll(r => r.Id == id);
+    richiesteInAttesa--;
+    richiesteApprovate++;
+
+    var oggi = DateTime.Today;
+    if (richiesta.DataInizio <= oggi && richiesta.DataFine >= oggi)
+      inFerieOggi.Add(richiesta);
+
+    await EmailService.InviaAsync(
+        richiesta.Utente.Email,
+        "La tua richiesta ferie è stata approvata ✅",
+        $"""
+        <p>Ciao {richiesta.Utente.Nome},</p>
+        <p>La tua richiesta di <strong>{richiesta.Tipo}</strong> dal <strong>{richiesta.DataInizio:dd/MM/yyyy}</strong> al <strong>{richiesta.DataFine:dd/MM/yyyy}</strong> è stata <strong>approvata</strong>.</p>
+        <p>Ore scalate: <strong>{richiesta.OreRichieste}</strong></p>
+        <p>Il team HR</p>
+        """
+    );
+
+    await InvokeAsync(StateHasChanged);
+    await AggiornaGrafici();
+  }
+
+  void ApriRifiuto(int id)
+  {
+    richiestaRifiutoId = id;
+    motivoRifiuto = "";
+    mostraModalRifiuto = true;
+  }
+
+  async Task ConfermaRifiuto()
+{
+    mostraModalRifiuto = false;          // ← chiude subito
+    await InvokeAsync(StateHasChanged);  // ← aggiorna UI subito
+
+    using var db = DbFactory.CreateDbContext();
+    var richiesta = await db.RichiestaFerie.Include(r => r.Utente).FirstOrDefaultAsync(r => r.Id == richiestaRifiutoId);
+    if (richiesta == null) return;
+
+    richiesta.Stato = StatoRichiesta.Rifiutata;
+    richiesta.MotivoRifiuto = motivoRifiuto;
+    await db.SaveChangesAsync();
+
+    richiesteAttesa.RemoveAll(r => r.Id == richiestaRifiutoId);
+    richiesteInAttesa--;
+    richiesteRifiutate++;
+
+    await EmailService.InviaAsync(
+        richiesta.Utente.Email,
+        "La tua richiesta ferie è stata rifiutata ❌",
+        $"""
+        <p>Ciao {richiesta.Utente.Nome},</p>
+        <p>La tua richiesta di <strong>{richiesta.Tipo}</strong> dal <strong>{richiesta.DataInizio:dd/MM/yyyy}</strong> al <strong>{richiesta.DataFine:dd/MM/yyyy}</strong> è stata <strong>rifiutata</strong>.</p>
+        <p>Motivo: <strong>{motivoRifiuto}</strong></p>
+        <p>Il team HR</p>
+        """
+    );
+
+    await InvokeAsync(StateHasChanged);
+}
+
+  string GetStatoBadge(StatoRichiesta stato) => stato switch
+  {
+    StatoRichiesta.Approvata => "badge-success",
+    StatoRichiesta.Rifiutata => "badge-danger",
+    _ => "badge-warning"
+  };
+
+  class OreDipendente
+  {
+    public string Nome { get; set; } = ""; public double OreUsate { get; set; }
+    public double
+OreDisponibili
+    { get; set; }
+  }
+  class RichiestaMese { public string Mese { get; set; } = ""; public int Conteggio { get; set; } }
+  class SaldoItem { public string Label { get; set; } = ""; public double Valore { get; set; } }
+}

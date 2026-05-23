@@ -1,0 +1,362 @@
+@page "/nuova-richiesta"
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject IHttpClientFactory HttpClientFactory
+@inject EmailService EmailService
+@inject IConfiguration Config
+@using GestioneFerie.Web.Services
+@using GestioneFerie.Web.Models
+@using GestioneFerie.Web.Data
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+
+<PageTitle>Nuova Richiesta</PageTitle>
+
+<div class="page-header">
+  <h2>Nuova richiesta</h2>
+  <p class="subtitle">Compila il modulo per richiedere ferie, permesso o segnalare una malattia</p>
+</div>
+
+@if (!string.IsNullOrEmpty(messaggio))
+{
+  <div class="alert @(successo ? "alert-success" : "alert-error")">@messaggio</div>
+}
+
+@if (tipo != "Malattia")
+{
+  @if (saldo != null)
+  {
+    <div class="saldo-bar">
+      <div class="saldo-item">
+        <span class="saldo-label">Ore totali anno @DateTime.Now.Year</span>
+        <span class="saldo-value">@saldo.OreTotali h</span>
+      </div>
+      <div class="saldo-item">
+        <span class="saldo-label">Ore usate</span>
+        <span class="saldo-value warning">@saldo.OreUsate h</span>
+      </div>
+      <div class="saldo-item">
+        <span class="saldo-label">Ore disponibili</span>
+        <span class="saldo-value success">@saldo.OreDisponibili h</span>
+      </div>
+    </div>
+  }
+  else
+  {
+    <div class="alert alert-error">
+      ⚠️ Nessun saldo ferie assegnato per il @DateTime.Now.Year. Contatta il responsabile.
+    </div>
+  }
+}
+
+<div class="form-card">
+  <div class="form-group">
+    <label>Tipo richiesta</label>
+    <select @bind="tipo" @bind:after="CalcolaOre">
+      <option value="Ferie">🌴 Ferie</option>
+      <option value="Permesso">🕐 Permesso</option>
+      <option value="Malattia">🤒 Malattia</option>
+    </select>
+  </div>
+
+  @if (tipo == "Malattia")
+  {
+    <div class="form-group">
+      <label>Codice malattia</label>
+      <input type="text" @bind="codiceMalattia" placeholder="Es. INPS-2026-XXXXXXXX" />
+      <span class="hint">Il codice ti viene fornito dal medico curante</span>
+    </div>
+  }
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>Data inizio</label>
+      <input type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@dataInizio.ToString("yyyy-MM-dd")"
+             @onchange="async e => {
+               dataInizio = DateTime.SpecifyKind(DateTime.Parse(e.Value!.ToString()!), DateTimeKind.Local);
+               await CalcolaOre();
+             }
+             " />
+    </div>
+    <div class="form-group">
+      <label>Data fine</label>
+      <input type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@dataFine.ToString("yyyy-MM-dd")"
+             @onchange="async e => {
+               dataFine = DateTime.SpecifyKind(DateTime.Parse(e.Value!.ToString()!), DateTimeKind.Local);
+               await CalcolaOre();
+             }
+             " />
+    </div>
+  </div>
+
+  @if (tipo == "Ferie")
+  {
+    <div class="form-group">
+      <label>Giorni lavorativi selezionati</label>
+      <div class="ore-display">
+        <span class="ore-numero">@giorniLavorativi</span>
+        <span class="ore-label">giorni → <strong>@ore ore</strong> (esclusi weekend e festivi italiani)</span>
+      </div>
+      @if (saldo != null)
+      {
+        <div class="saldo-preview @(saldo.OreDisponibili - ore < 0 ? "saldo-negativo" : "saldo-positivo")">
+          <span>Ore disponibili ora: <strong>@saldo.OreDisponibili</strong></span>
+          <span class="arrow">→</span>
+          <span>Dopo la richiesta: <strong>@(saldo.OreDisponibili - ore)</strong></span>
+          @if (saldo.OreDisponibili - ore < 0)
+          {
+            <span class="warning-text">⚠️ Ore insufficienti!</span>
+          }
+        </div>
+      }
+    </div>
+  }
+  else if (tipo == "Permesso")
+  {
+    <div class="form-group">
+      <label>Ore di permesso</label>
+      <input type="number" @bind="ore" min="0.5" max="8" step="0.5" placeholder="Es. 4" />
+      @if (saldo != null && ore > 0)
+      {
+        <div class="saldo-preview @(saldo.OreDisponibili - ore < 0 ? "saldo-negativo" : "saldo-positivo")">
+          <span>Ore disponibili ora: <strong>@saldo.OreDisponibili</strong></span>
+          <span class="arrow">→</span>
+          <span>Dopo la richiesta: <strong>@(saldo.OreDisponibili - ore)</strong></span>
+          @if (saldo.OreDisponibili - ore < 0)
+          {
+            <span class="warning-text">⚠️ Ore insufficienti!</span>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <div class="form-group">
+    <label>Note (opzionale)</label>
+    <textarea @bind="note" placeholder="Aggiungi una nota..."></textarea>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn-primary" @onclick="InviaRichiesta" disabled="@caricamento">
+      @(caricamento ? "Invio in corso..." : "Invia richiesta")
+    </button>
+    <a href="/dashboard" class="btn-secondary">Annulla</a>
+  </div>
+</div>
+
+@code {
+  string tipo = "Ferie";
+  DateTime dataInizio = DateTime.Today;
+  DateTime dataFine = DateTime.Today;
+  decimal ore = 0;
+  int giorniLavorativi = 0;
+  string note = "";
+  string codiceMalattia = "";
+  string messaggio = "";
+  bool successo = false;
+  bool caricamento = false;
+  SaldoFerie? saldo;
+  HashSet<DateTime> festiviCache = new();
+  int anniCacheati = 0;
+
+  protected override async Task OnInitializedAsync()
+  {
+    if (!Auth.IsAuthenticated)
+    {
+      Nav.NavigateTo("/login");
+      return;
+    }
+    using var db = DbFactory.CreateDbContext();
+    saldo = await db.SaldoFerie.FirstOrDefaultAsync(s =>
+        s.UtenteId == Auth.UtenteId && s.Anno == DateTime.Now.Year);
+    await CalcolaOre();
+  }
+
+  HashSet<DateTime> GetFestivi(int anno)
+  {
+    if (anniCacheati == anno && festiviCache.Count > 0)
+      return new HashSet<DateTime>(festiviCache);
+
+    festiviCache = GetFestiviFissi(anno);
+    anniCacheati = anno;
+    return new HashSet<DateTime>(festiviCache);
+  }
+
+  HashSet<DateTime> GetFestiviFissi(int anno)
+  {
+    var festivi = new HashSet<DateTime>
+        {
+            new DateTime(anno, 1, 1),
+            new DateTime(anno, 1, 6),
+            new DateTime(anno, 4, 25),
+            new DateTime(anno, 5, 1),
+            new DateTime(anno, 6, 2),
+            new DateTime(anno, 8, 15),
+            new DateTime(anno, 11, 1),
+            new DateTime(anno, 12, 8),
+            new DateTime(anno, 12, 25),
+            new DateTime(anno, 12, 26),
+        };
+    var pasqua = CalcolaPasqua(anno);
+    festivi.Add(pasqua);
+    festivi.Add(pasqua.AddDays(1));
+    return festivi;
+  }
+
+  DateTime CalcolaPasqua(int anno)
+  {
+    int a = anno % 19, b = anno / 100, c = anno % 100;
+    int d = b / 4, e = b % 4, f = (b + 8) / 25;
+    int g = (b - f + 1) / 3;
+    int h = (19 * a + b - d - g + 15) % 30;
+    int i = c / 4, k = c % 4;
+    int l = (32 + 2 * e + 2 * i - h - k) % 7;
+    int m = (a + 11 * h + 22 * l) / 451;
+    int mese = (h + l - 7 * m + 114) / 31;
+    int giorno = ((h + l - 7 * m + 114) % 31) + 1;
+    return new DateTime(anno, mese, giorno);
+  }
+
+  async Task CalcolaOre()
+  {
+    if (tipo != "Ferie")
+    {
+      giorniLavorativi = 0;
+      if (tipo == "Malattia") ore = 0;
+      StateHasChanged();
+      return;
+    }
+    if (dataFine.Date < dataInizio.Date)
+    {
+      giorniLavorativi = 0;
+      ore = 0;
+      StateHasChanged();
+      return;
+    }
+
+    var festivi = GetFestivi(dataInizio.Year);
+    if (dataFine.Year != dataInizio.Year)
+      festivi.UnionWith(GetFestivi(dataFine.Year));
+
+    int giorni = 0;
+    for (var d = dataInizio.Date; d <= dataFine.Date; d = d.AddDays(1))
+    {
+      bool isWeekend = d.DayOfWeek == DayOfWeek.Saturday || d.DayOfWeek == DayOfWeek.Sunday;
+      bool isFestivo = festivi.Contains(d.Date);
+      if (!isWeekend && !isFestivo) giorni++;
+    }
+
+    giorniLavorativi = giorni;
+    ore = giorni * 8;
+    StateHasChanged();
+  }
+
+  async Task InviaRichiesta()
+  {
+    if (dataInizio.Date < DateTime.Today.Date)
+    {
+      messaggio = "Non puoi richiedere ferie per date già passate.";
+      successo = false;
+      return;
+    }
+    if (dataFine.Date < dataInizio.Date)
+    {
+      messaggio = "La data di fine non può essere prima della data di inizio.";
+      successo = false;
+      return;
+    }
+    if (tipo == "Malattia" && string.IsNullOrWhiteSpace(codiceMalattia))
+    {
+      messaggio = "Inserisci il codice malattia.";
+      successo = false;
+      return;
+    }
+    if (tipo != "Malattia" && ore <= 0)
+    {
+      messaggio = tipo == "Ferie"
+          ? "Nessun giorno lavorativo nel periodo selezionato."
+          : "Inserisci le ore di permesso.";
+      successo = false;
+      return;
+    }
+
+    caricamento = true;
+    StateHasChanged();
+
+    using var db = DbFactory.CreateDbContext();
+    db.RichiestaFerie.Add(new RichiestaFerie
+    {
+      UtenteId = Auth.UtenteId!.Value,
+      Tipo = Enum.Parse<TipoRichiesta>(tipo),
+      DataInizio = dataInizio,
+      DataFine = dataFine,
+      OreRichieste = ore,
+      Note = string.IsNullOrWhiteSpace(note) ? null : note,
+      CodiceMalattia = tipo == "Malattia" ? codiceMalattia : null,
+      Stato = StatoRichiesta.InAttesa,
+      DataRichiesta = DateTime.Now
+    });
+    await db.SaveChangesAsync();
+
+    if (tipo == "Malattia")
+    {
+      var emailHR = Config["EmailHR"] ?? "";
+      if (!string.IsNullOrEmpty(emailHR))
+      {
+        await EmailService.InviaAsync(
+            emailHR,
+            $"🤒 Segnalazione malattia - {Auth.UtenteNome}",
+            $"""
+                    <p>Il dipendente <strong>{Auth.UtenteNome}</strong> ha segnalato una malattia.</p>
+                    <p>Codice malattia: <strong>{codiceMalattia}</strong></p>
+                    <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
+                    <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
+                    <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
+                    """
+        );
+      }
+      messaggio = "Malattia segnalata! Il codice è stato inviato all'ufficio HR.";
+    }
+    else
+    {
+      var capi = await db.Utenti
+          .Where(u => u.Ruolo == Ruolo.Capo)
+          .ToListAsync();
+
+      foreach (var capo in capi)
+      {
+        await EmailService.InviaAsync(
+            capo.Email,
+            $"📋 Nuova richiesta di {tipo} - {Auth.UtenteNome}",
+            $"""
+                    <p>Il dipendente <strong>{Auth.UtenteNome}</strong> ha inviato una nuova richiesta.</p>
+                    <p>Tipo: <strong>{tipo}</strong></p>
+                    <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
+                    <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
+                    <p>Ore: <strong>{ore}</strong></p>
+                    <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
+                    <p>Accedi al pannello per approvare o rifiutare.</p>
+                    """
+        );
+      }
+      messaggio = "Richiesta inviata con successo! Il capo la esaminerà a breve.";
+    }
+
+    successo = true;
+    caricamento = false;
+    tipo = "Ferie";
+    dataInizio = DateTime.Today;
+    dataFine = DateTime.Today;
+    note = "";
+    codiceMalattia = "";
+    await CalcolaOre();
+  }
+
+  class PublicHoliday
+  {
+    public DateTime Date { get; set; }
+    public string LocalName { get; set; } = "";
+    public string Name { get; set; } = "";
+  }
+}

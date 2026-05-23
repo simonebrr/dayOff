@@ -1,0 +1,436 @@
+@page "/calendario"
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject IConfiguration _config
+@inject EmailService EmailService
+@using GestioneFerie.Web.Services
+@using GestioneFerie.Web.Models
+@using GestioneFerie.Web.Data
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+
+<PageTitle>Calendario</PageTitle>
+
+<style>
+  .modal-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 99999 !important;
+  }
+
+  .modal-box {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    width: 90%;
+    max-width: 460px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .modal-box h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .modal-box p {
+    color: #555;
+    margin: 0;
+    font-size: 0.95rem;
+  }
+
+  .modal-box .modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .modal-warning {
+    background: #fff8e1;
+    border-left: 4px solid #f59e0b;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    color: #92400e;
+    font-size: 0.9rem;
+  }
+
+  .btn-elimina {
+    background: transparent;
+    color: #e53e3e;
+    border: 1.5px solid #e53e3e;
+    padding: 0.4rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .btn-elimina:hover {
+    background: #e53e3e;
+    color: white;
+  }
+
+  .btn-cancel {
+    background: transparent;
+    color: #666;
+    border: 1.5px solid #ddd;
+    padding: 0.4rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-cancel:hover {
+    background: #f5f5f5;
+  }
+</style>
+
+<div class="page-header">
+  <h2>Calendario ferie</h2>
+  <p class="subtitle">Visualizza le ferie e permessi</p>
+</div>
+
+<div class="filtri">
+  <div class="filtro-group">
+    <label>Dal</label>
+    <input type="date" value="@dalData.ToString("yyyy-MM-dd")"
+           @onchange="e => { dalData = DateTime.Parse(e.Value!.ToString()!); Filtra(); }" />
+  </div>
+  <div class="filtro-group">
+    <label>Al</label>
+    <input type="date" value="@alData.ToString("yyyy-MM-dd")"
+           @onchange="e => { alData = DateTime.Parse(e.Value!.ToString()!); Filtra(); }" />
+  </div>
+  <div class="filtro-group">
+    <label>Tipo</label>
+    <select @bind="tipoScelto" @bind:after="Filtra">
+      <option value="">Tutti</option>
+      <option value="Ferie">🌴 Ferie</option>
+      <option value="Permesso">🕐 Permesso</option>
+      <option value="Malattia">🤒 Malattia</option>
+    </select>
+  </div>
+  <div class="filtro-group">
+    <label>Stato</label>
+    <select @bind="statoScelto" @bind:after="Filtra">
+      <option value="">Tutti</option>
+      <option value="InAttesa">⏳ In attesa</option>
+      <option value="Approvata">✅ Approvata</option>
+      <option value="Rifiutata">❌ Rifiutata</option>
+    </select>
+  </div>
+  @if (Auth.IsCapo)
+  {
+    <div class="filtro-group autocomplete-wrapper">
+      <label>Dipendente</label>
+      <input type="text" placeholder="Tutti i dipendenti" value="@cercaDipendente" @oninput="OnCercaDipendente"
+             @onfocus="OnFocusDipendente" />
+      @if (suggerimenti.Any())
+      {
+        <div class="autocomplete-list">
+          @if (!string.IsNullOrEmpty(cercaDipendente))
+          {
+            <div class="autocomplete-item reset" @onclick="ResetDipendente">
+              ✕ Tutti i dipendenti
+            </div>
+          }
+          @foreach (var d in suggerimenti)
+          {
+            <div class="autocomplete-item" @onclick="() => SelezionaDipendente(d)">
+              @d.Nome @d.Cognome
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (!richieste.Any())
+{
+  <div class="empty-state">Nessuna richiesta trovata per i filtri selezionati 📅</div>
+}
+else
+{
+  <div class="table-card">
+    <table class="table">
+      <thead>
+        <tr>
+          @if (Auth.IsCapo)
+          {
+            <th>Dipendente</th>
+          }
+          <th>Tipo</th>
+          <th>Dal</th>
+          <th>Al</th>
+          <th>Ore</th>
+          <th>Stato</th>
+          <th>Note</th>
+          @if (!Auth.IsCapo)
+          {
+            <th>Azioni</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var r in richieste)
+        {
+          <tr>
+            @if (Auth.IsCapo)
+            {
+              <td>@r.Utente.Nome @r.Utente.Cognome</td>
+            }
+            <td>
+              <span
+                class="badge @(r.Tipo == TipoRichiesta.Ferie ? "badge-ferie" : r.Tipo == TipoRichiesta.Permesso ? "badge-permesso" : "badge-malattia")">
+                @r.Tipo
+              </span>
+            </td>
+            <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
+            <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
+            <td>@r.OreRichieste</td>
+            <td><span class="badge @GetStatoBadge(r.Stato)">@r.Stato</span></td>
+            <td>@(r.Note ?? "—")</td>
+            @if (!Auth.IsCapo)
+            {
+              <td>
+                @if (r.Stato == StatoRichiesta.InAttesa || r.Stato == StatoRichiesta.Approvata)
+                {
+                  <button class="btn-elimina" @onclick="() => ApriConfermaElimina(r.Id)">🗑️ Elimina</button>
+                }
+              </td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="totali">
+    <div class="totale-item">
+      <span class="totale-label">Totale richieste</span>
+      <span class="totale-value">@richieste.Count</span>
+    </div>
+    <div class="totale-item">
+      <span class="totale-label">Totale ore</span>
+      <span class="totale-value">@richieste.Sum(r => r.OreRichieste) h</span>
+    </div>
+    <div class="totale-item">
+      <span class="totale-label">Di cui ferie</span>
+      <span class="totale-value">@richieste.Where(r => r.Tipo == TipoRichiesta.Ferie).Sum(r => r.OreRichieste) h</span>
+    </div>
+    <div class="totale-item">
+      <span class="totale-label">Di cui permessi</span>
+      <span class="totale-value">@richieste.Where(r => r.Tipo == TipoRichiesta.Permesso).Sum(r => r.OreRichieste) h</span>
+    </div>
+  </div>
+}
+
+@if (mostraConfermaElimina)
+{
+  <div class="modal-overlay">
+    <div class="modal-box">
+      <h3>Conferma eliminazione</h3>
+      <p>Sei sicuro di voler eliminare questa richiesta?</p>
+      @if (richiestaConfermaStato == StatoRichiesta.Approvata)
+      {
+        <p class="modal-warning">⚠️ Questa richiesta è già approvata — le ore verranno restituite al tuo saldo.</p>
+      }
+      <div class="modal-actions">
+        <button class="btn-elimina" @onclick="ConfermaElimina">🗑️ Elimina</button>
+        <button class="btn-cancel" @onclick="() => mostraConfermaElimina = false">Annulla</button>
+      </div>
+    </div>
+  </div>
+}
+
+@code {
+  List<RichiestaFerie> richieste = new();
+  List<Utente> dipendenti = new();
+  List<RichiestaFerie> tutteLeRichieste = new();
+
+  DateTime dalData = new DateTime(DateTime.Now.Year, 1, 1);
+  DateTime alData = new DateTime(DateTime.Now.Year, 12, 31);
+  string tipoScelto = "";
+  string statoScelto = "";
+  int dipendenteScelto = 0;
+
+  bool mostraConfermaElimina = false;
+  int richiestaEliminaId;
+  StatoRichiesta richiestaConfermaStato;
+
+  string cercaDipendente = "";
+  List<Utente> suggerimenti = new();
+
+  protected override async Task OnInitializedAsync()
+  {
+    if (!Auth.IsAuthenticated)
+    {
+      Nav.NavigateTo("/login");
+      return;
+    }
+
+    await CancellaScaduteInAttesa();
+    await CaricaRichieste();
+    Filtra();
+  }
+
+  async Task CancellaScaduteInAttesa()
+  {
+    using var db = DbFactory.CreateDbContext();
+    var oggi = DateTime.Today;
+
+    var scadute = await db.RichiestaFerie
+        .Where(r => r.Stato == StatoRichiesta.InAttesa && r.DataInizio < oggi)
+        .ToListAsync();
+
+    if (scadute.Any())
+    {
+      db.RichiestaFerie.RemoveRange(scadute);
+      await db.SaveChangesAsync();
+    }
+  }
+
+  async Task CaricaRichieste()
+  {
+    using var db = DbFactory.CreateDbContext();
+
+    if (Auth.IsCapo)
+    {
+      dipendenti = await db.Utenti
+          .Where(u => u.Ruolo == Ruolo.Dipendente)
+          .ToListAsync();
+
+      tutteLeRichieste = await db.RichiestaFerie
+          .Include(r => r.Utente)
+          .OrderBy(r => r.DataInizio)
+          .ToListAsync();
+    }
+    else
+    {
+      tutteLeRichieste = await db.RichiestaFerie
+          .Include(r => r.Utente)
+          .Where(r => r.UtenteId == Auth.UtenteId)
+          .OrderBy(r => r.DataInizio)
+          .ToListAsync();
+    }
+  }
+
+  void Filtra()
+  {
+    richieste = tutteLeRichieste.Where(r =>
+    {
+      bool okData = r.DataInizio <= alData && r.DataFine >= dalData;
+      bool okTipo = string.IsNullOrEmpty(tipoScelto) || r.Tipo.ToString() == tipoScelto;
+      bool okStato = string.IsNullOrEmpty(statoScelto) || r.Stato.ToString() == statoScelto;
+      bool okDipendente = dipendenteScelto == 0 || r.UtenteId == dipendenteScelto;
+      return okData && okTipo && okStato && okDipendente;
+    }).ToList();
+  }
+
+  void ApriConfermaElimina(int id)
+  {
+    richiestaEliminaId = id;
+    richiestaConfermaStato = tutteLeRichieste.First(r => r.Id == id).Stato;
+    mostraConfermaElimina = true;
+  }
+
+  async Task ConfermaElimina()
+  {
+    mostraConfermaElimina = false;
+    await InvokeAsync(StateHasChanged);
+
+    using var db = DbFactory.CreateDbContext();
+    var richiesta = await db.RichiestaFerie
+        .Include(r => r.Utente)
+        .FirstOrDefaultAsync(r => r.Id == richiestaEliminaId);
+    if (richiesta == null) return;
+
+    if (richiesta.Stato == StatoRichiesta.Approvata)
+    {
+      var saldo = await db.SaldoFerie.FirstOrDefaultAsync(s =>
+          s.UtenteId == richiesta.UtenteId && s.Anno == DateTime.Now.Year);
+      if (saldo != null) saldo.OreUsate -= richiesta.OreRichieste;
+    }
+
+    db.RichiestaFerie.Remove(richiesta);
+    await db.SaveChangesAsync();
+
+    var emailHR = _config["Email"] ?? "";
+    if (!string.IsNullOrEmpty(emailHR))
+    {
+      var emailService = EmailService;
+      _ = Task.Run(() => emailService.InviaAsync(
+          emailHR,
+          $"🗑️ {richiesta.Utente.Nome} ha eliminato una richiesta",
+          $"""
+          <p><strong>{richiesta.Utente.Nome} {richiesta.Utente.Cognome}</strong> ha eliminato la seguente richiesta:</p>
+          <p>Tipo: <strong>{richiesta.Tipo}</strong></p>
+          <p>Dal: <strong>{richiesta.DataInizio:dd/MM/yyyy}</strong> al <strong>{richiesta.DataFine:dd/MM/yyyy}</strong></p>
+          <p>Ore: <strong>{richiesta.OreRichieste}</strong></p>
+          <p>Stato precedente: <strong>{richiesta.Stato}</strong></p>
+          """
+      ));
+    }
+
+    tutteLeRichieste.RemoveAll(r => r.Id == richiestaEliminaId);
+    Filtra();
+    await InvokeAsync(StateHasChanged);
+  }
+
+  string GetStatoBadge(StatoRichiesta stato) => stato switch
+  {
+    StatoRichiesta.Approvata => "badge-success",
+    StatoRichiesta.Rifiutata => "badge-danger",
+    _ => "badge-warning"
+  };
+
+  void OnFocusDipendente()
+  {
+    suggerimenti = string.IsNullOrWhiteSpace(cercaDipendente)
+        ? dipendenti
+        : dipendenti
+            .Where(d => $"{d.Nome} {d.Cognome}".Contains(cercaDipendente, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+  }
+
+  void OnCercaDipendente(ChangeEventArgs e)
+  {
+    cercaDipendente = e.Value?.ToString() ?? "";
+    if (string.IsNullOrWhiteSpace(cercaDipendente))
+    {
+      suggerimenti = dipendenti;
+      dipendenteScelto = 0;
+      Filtra();
+      return;
+    }
+    suggerimenti = dipendenti
+        .Where(d => $"{d.Nome} {d.Cognome}".Contains(cercaDipendente, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+  }
+
+  void SelezionaDipendente(Utente d)
+  {
+    dipendenteScelto = d.Id;
+    cercaDipendente = $"{d.Nome} {d.Cognome}";
+    suggerimenti = new();
+    Filtra();
+  }
+
+  void ResetDipendente()
+  {
+    dipendenteScelto = 0;
+    cercaDipendente = "";
+    suggerimenti = new();
+    Filtra();
+  }
+}
