@@ -20,23 +20,67 @@
   <div class="alert @(errore ? "alert-error" : "alert-success")">@messaggio</div>
 }
 
+@if (Auth.IsCapo)
+{
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">👥 Dipendenti</div>
+      <div class="stat-value">@statDipendenti</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">⏳ Richieste in attesa</div>
+      <div class="stat-value warning">@statInAttesa</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">📅 Ore totali gestite @DateTime.Now.Year</div>
+      <div class="stat-value">@statOreTotali h</div>
+    </div>
+  </div>
+}
+
 <div class="grid-2">
-  <div class="form-card">
-    <h3>Informazioni personali</h3>
-    <div class="info-row">
-      <span class="info-label">Nome</span>
-      <span class="info-value">@utente?.Nome @utente?.Cognome</span>
+  <div>
+    <div class="form-card" style="margin-bottom:1rem">
+      <h3>Informazioni personali</h3>
+      <div class="info-row">
+        <span class="info-label">Nome</span>
+        <span class="info-value">@utente?.Nome @utente?.Cognome</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Email</span>
+        <span class="info-value">@utente?.Email</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Ruolo</span>
+        <span class="role-badge @(Auth.IsCapo ? "badge-capo" : "badge-dipendente")">
+          @(Auth.IsCapo ? "Capo" : "Dipendente")
+        </span>
+      </div>
     </div>
-    <div class="info-row">
-      <span class="info-label">Email</span>
-      <span class="info-value">@utente?.Email</span>
-    </div>
-    <div class="info-row">
-      <span class="info-label">Ruolo</span>
-      <span class="role-badge @(Auth.IsCapo ? "badge-capo" : "badge-dipendente")">
-        @(Auth.IsCapo ? "Capo" : "Dipendente")
-      </span>
-    </div>
+
+    @if (Auth.IsCapo && azienda != null)
+    {
+      <div class="form-card">
+        <h3>La mia azienda</h3>
+        <div class="info-row">
+          <span class="info-label">Nome</span>
+          <span class="info-value">@azienda.Nome</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Email malattia</span>
+          <span class="info-value">
+            @if (string.IsNullOrEmpty(azienda.EmailMalattia))
+            {
+              <span class="info-muted">Non configurata — arrivano a te</span>
+            }
+            else
+            {
+              @azienda.EmailMalattia
+            }
+          </span>
+        </div>
+      </div>
+    }
   </div>
 
   <div class="form-card">
@@ -58,13 +102,18 @@
 </div>
 
 @code {
-
   Utente? utente;
+  GestioneFerie.Web.Models.Azienda? azienda;
   string messaggio = "";
   bool errore = false;
   string vecchiaPassword = "";
   string nuovaPassword = "";
   string confermaPassword = "";
+
+  int statDipendenti;
+  int statInAttesa;
+  decimal statOreTotali;
+
   protected override async Task OnInitializedAsync()
   {
     if (!Auth.IsAuthenticated)
@@ -72,13 +121,28 @@
       Nav.NavigateTo("/login");
       return;
     }
-    await CaricaUtente();
+    await CaricaDati();
   }
 
-  async Task CaricaUtente()
+  async Task CaricaDati()
   {
     using var db = DbFactory.CreateDbContext();
     utente = await db.Utenti.FindAsync(Auth.UtenteId);
+
+    if (Auth.IsCapo && Auth.AziendaId != null)
+    {
+      azienda = await db.Aziende.FindAsync(Auth.AziendaId);
+
+      statDipendenti = await db.Utenti
+          .CountAsync(u => u.AziendaId == Auth.AziendaId && u.Ruolo == Ruolo.Dipendente);
+
+      statInAttesa = await db.RichiestaFerie
+          .CountAsync(r => r.Stato == StatoRichiesta.InAttesa && r.Utente.AziendaId == Auth.AziendaId);
+
+      statOreTotali = await db.SaldoFerie
+          .Where(s => s.Anno == DateTime.Now.Year && s.Utente.AziendaId == Auth.AziendaId)
+          .SumAsync(s => s.OreTotali);
+    }
   }
 
   async Task CambiaPassword()
@@ -95,19 +159,25 @@
       errore = true;
       return;
     }
+    if (nuovaPassword != confermaPassword)
+    {
+      messaggio = "Le password non coincidono.";
+      errore = true;
+      return;
+    }
 
     using var db = DbFactory.CreateDbContext();
-    var UtenteDb = await db.Utenti.FindAsync(Auth.UtenteId);
-    if (UtenteDb == null) return;
+    var utenteDb = await db.Utenti.FindAsync(Auth.UtenteId);
+    if (utenteDb == null) return;
 
-    if (!BCrypt.Net.BCrypt.Verify(vecchiaPassword, UtenteDb.PasswordHash))
+    if (!BCrypt.Net.BCrypt.Verify(vecchiaPassword, utenteDb.PasswordHash))
     {
       messaggio = "La password attuale non è corretta.";
       errore = true;
       return;
     }
 
-    UtenteDb.PasswordHash = BCrypt.Net.BCrypt.HashPassword(nuovaPassword);
+    utenteDb.PasswordHash = BCrypt.Net.BCrypt.HashPassword(nuovaPassword);
     await db.SaveChangesAsync();
 
     messaggio = "Password aggiornata con successo!";
