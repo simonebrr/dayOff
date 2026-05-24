@@ -1,0 +1,32 @@
+# Build output
+bin/
+obj/
+
+# Database locale (SQLite)
+*.db
+*.db-shm
+*.db-wal
+
+# Configurazioni con segreti
+appsettings.Development.json
+
+# User-specific files
+*.user
+*.suo
+.vs/
+*.lscache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# NuGet
+*.nupkg
+.nuget/
+
+# Publish output
+publish/
