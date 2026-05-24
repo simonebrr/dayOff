@@ -101,8 +101,6 @@ public static class DbSeeder
       }
     }
 
-    var aziendaDemo = db.Aziende.First(a => a.CapoId == capo.Id);
-
     if (!db.SaldoFerie.Any(s => s.UtenteId == luca.Id))
       db.SaldoFerie.Add(new SaldoFerie { UtenteId = luca.Id, OreTotali = 160, OreUsate = 0, Anno = DateTime.Now.Year });
 
