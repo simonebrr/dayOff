@@ -58,7 +58,8 @@
 
     if (successo)
     {
-      Nav.NavigateTo("/dashboard", forceLoad: true);
+      var destinazione = Auth.IsSuperAdmin ? "/admin" : "/dashboard";
+      Nav.NavigateTo(destinazione, forceLoad: true);
     }
     else
     {
