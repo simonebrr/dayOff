@@ -168,14 +168,18 @@ else
     Colors = new List<string> { "#F09595", "#1D9E75" }
   };
 
-  protected override async Task OnInitializedAsync()
+  protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    if (!Auth.IsAuthenticated || !Auth.IsCapo)
+    if (firstRender)
     {
-      Nav.NavigateTo("/dashboard");
-      return;
+      if (!Auth.IsAuthenticated || !Auth.IsCapo)
+      {
+        Nav.NavigateTo("/dashboard");
+        return;
+      }
+      await CaricaDati();
+      StateHasChanged();
     }
-    await CaricaDati();
   }
 
   async Task CaricaDati()

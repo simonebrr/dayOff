@@ -54,17 +54,27 @@
     errore = "";
     StateHasChanged();
 
-    var (successo, messaggio) = await Auth.LoginAsync(email, password);
+    try
+    {
+      var (successo, messaggio) = await Auth.LoginAsync(email, password);
 
-    if (successo)
-    {
-      var destinazione = Auth.IsSuperAdmin ? "/admin" : "/dashboard";
-      Nav.NavigateTo(destinazione, forceLoad: true);
+      if (successo)
+      {
+        Nav.NavigateTo(Auth.IsSuperAdmin ? "/admin" : "/dashboard", forceLoad: true);
+      }
+      else
+      {
+        errore = messaggio;
+      }
     }
-    else
+    catch (Exception ex)
     {
-      errore = messaggio;
+      errore = $"Errore inatteso: {ex.Message}";
+    }
+    finally
+    {
       caricamento = false;
+      StateHasChanged();
     }
   }
 }

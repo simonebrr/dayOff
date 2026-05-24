@@ -84,14 +84,18 @@ else
   string motivoRifiuto = "";
   bool mostraModalRifiuto = false;
 
-  protected override async Task OnInitializedAsync()
+  protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    if (!Auth.IsAuthenticated || !Auth.IsCapo)
+    if (firstRender)
     {
-      Nav.NavigateTo("/dashboard");
-      return;
+      if (!Auth.IsAuthenticated || !Auth.IsCapo)
+      {
+        Nav.NavigateTo("/dashboard");
+        return;
+      }
+      await CaricaRichieste();
+      StateHasChanged();
     }
-    await CaricaRichieste();
   }
 
   async Task CaricaRichieste()

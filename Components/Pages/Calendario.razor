@@ -271,17 +271,20 @@ else
   string cercaDipendente = "";
   List<Utente> suggerimenti = new();
 
-  protected override async Task OnInitializedAsync()
+  protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    if (!Auth.IsAuthenticated)
+    if (firstRender)
     {
-      Nav.NavigateTo("/login");
-      return;
+      if (!Auth.IsAuthenticated)
+      {
+        Nav.NavigateTo("/login");
+        return;
+      }
+      await CancellaScaduteInAttesa();
+      await CaricaRichieste();
+      Filtra();
+      StateHasChanged();
     }
-
-    await CancellaScaduteInAttesa();
-    await CaricaRichieste();
-    Filtra();
   }
 
   async Task CancellaScaduteInAttesa()

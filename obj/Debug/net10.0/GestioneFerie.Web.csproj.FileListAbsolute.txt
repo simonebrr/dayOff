@@ -477,6 +477,7 @@
 /home/simo/Desktop/GestioneFerie/GestioneFerie.Web/bin/Debug/net10.0/MimeKit.dll
 /home/simo/Desktop/GestioneFerie/GestioneFerie.Web/obj/Debug/net10.0/scopedcss/Components/Pages/DettaglioDipendente.razor.rz.scp.css
 /home/simo/Desktop/GestioneFerie/GestioneFerie.Web/obj/Debug/net10.0/scopedcss/Components/Pages/Profilo.razor.rz.scp.css
-/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/obj/Debug/net10.0/compressed/bg0leojfem-{0}-uphferde9o-uphferde9o.gz
-/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/obj/Debug/net10.0/compressed/w98bcrutwx-{0}-uphferde9o-uphferde9o.gz
-/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/obj/Debug/net10.0/compressed/5f6d3wt9ig-{0}-ip13e0qzbx-ip13e0qzbx.gz
+/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/obj/Debug/net10.0/GestioneFerie.Web.sourcelink.json
+/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/obj/Debug/net10.0/compressed/5f6d3wt9ig-{0}-rh0oso0y4s-rh0oso0y4s.gz
+/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/obj/Debug/net10.0/compressed/bg0leojfem-{0}-o8zzm8fn4o-o8zzm8fn4o.gz
+/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/obj/Debug/net10.0/compressed/w98bcrutwx-{0}-o8zzm8fn4o-o8zzm8fn4o.gz

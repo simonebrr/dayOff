@@ -146,14 +146,19 @@ else
   string modificaNome = "";
   string modificaEmailMalattia = "";
 
-  protected override async Task OnInitializedAsync()
+  protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    if (!Auth.IsAuthenticated || !Auth.IsSuperAdmin)
+    if (firstRender)
     {
-      Nav.NavigateTo("/dashboard");
-      return;
+      await Auth.LoadSessionAsync();
+      if (!Auth.IsAuthenticated || !Auth.IsSuperAdmin)
+      {
+        Nav.NavigateTo("/login");
+        return;
+      }
+      await CaricaAziende();
+      StateHasChanged();
     }
-    await CaricaAziende();
   }
 
   async Task CaricaAziende()

@@ -93,103 +93,105 @@ else
                 }
                 else
                 {
-                  <button class="btn-edit" @onclick="() => ApriModificaSaldo(d.Utente.Id, d.Saldo?.OreTotali ?? 0)">✏️ Saldo</button>
+                  <button class="btn-edit" @onclick="() => ApriModificaSaldo(d.Utente.Id, d.Saldo?.OreTotali ?? 0)">✏️
+                    Saldo</button>
+                  }
                 }
-              }
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </div>
-}
-
-@if (mostraModalNuovo)
-{
-  <div class="modal-overlay">
-    <div class="modal">
-      <h3>Nuovo dipendente</h3>
-      <div class="form-group">
-        <label>Nome</label>
-        <input type="text" @bind="nuovoNome" placeholder="Mario" />
-      </div>
-      <div class="form-group">
-        <label>Cognome</label>
-        <input type="text" @bind="nuovoCognome" placeholder="Rossi" />
-      </div>
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" @bind="nuovaEmail" placeholder="mario.rossi@azienda.it" />
-      </div>
-      <div class="form-group">
-        <label>Ore ferie anno @DateTime.Now.Year</label>
-        <input type="number" @bind="nuoveOre" min="0" placeholder="Es. 160" />
-      </div>
-      <div class="modal-actions">
-        <button class="btn-primary" @onclick="AggiungiDipendente">Aggiungi</button>
-        <button class="btn-cancel" @onclick="() => mostraModalNuovo = false">Annulla</button>
-      </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
     </div>
-  </div>
-}
+  }
 
-@if (mostraModalAssegnaTutti)
-{
-  <div class="modal-overlay">
-    <div class="modal">
-      <h3>Assegna ore a tutti i dipendenti</h3>
-      <p class="modal-subtitle">Sovrascrive il saldo ferie di tutti i dipendenti per l'anno @DateTime.Now.Year</p>
-      <div class="form-group">
-        <label>Ore totali ferie</label>
-        <input type="number" @bind="oreAssegnaTutti" min="0" placeholder="Es. 160" />
-      </div>
-      <div class="modal-actions">
-        <button class="btn-primary" @onclick="AssegnaTutti">Assegna a tutti</button>
-        <button class="btn-cancel" @onclick="() => mostraModalAssegnaTutti = false">Annulla</button>
-      </div>
-    </div>
-  </div>
-}
-
-@if (mostraModalCsv)
-{
-  <div class="modal-overlay">
-    <div class="modal">
-      <h3>Importa dipendenti da CSV</h3>
-      <p class="modal-subtitle">Formato: <code>Nome,Cognome,Email,OreFerie</code> (OreFerie opzionale, default 160)</p>
-      <div class="form-group">
-        <label>File CSV</label>
-        <InputFile OnChange="OnCsvFileSelected" accept=".csv" />
-      </div>
-      @if (csvRighe.Any())
-      {
+  @if (mostraModalNuovo)
+  {
+    <div class="modal-overlay">
+      <div class="modal">
+        <h3>Nuovo dipendente</h3>
         <div class="form-group">
-          <p>Trovate <strong>@csvRighe.Count</strong> righe da importare.</p>
-          <div style="max-height:150px;overflow-y:auto;font-size:0.85em;border:1px solid #ddd;border-radius:6px;padding:8px;">
-            @foreach (var r in csvRighe.Take(10))
-            {
-              <div>@r.Nome @r.Cognome — @r.Email — @r.OreFerie ore</div>
-            }
-            @if (csvRighe.Count > 10)
-            {
-              <div>...e altri @(csvRighe.Count - 10)</div>
-            }
-          </div>
+          <label>Nome</label>
+          <input type="text" @bind="nuovoNome" placeholder="Mario" />
         </div>
-      }
-      @if (!string.IsNullOrEmpty(csvMessaggio))
-      {
-        <div class="alert @(csvErrore ? "alert-error" : "alert-success")">@csvMessaggio</div>
-      }
-      <div class="modal-actions">
-        <button class="btn-primary" @onclick="ImportaCsv" disabled="@(!csvRighe.Any() || csvImportando)">
-          @(csvImportando ? "Importazione..." : "Importa")
-        </button>
-        <button class="btn-cancel" @onclick="ChiudiModalCsv">Annulla</button>
+        <div class="form-group">
+          <label>Cognome</label>
+          <input type="text" @bind="nuovoCognome" placeholder="Rossi" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" @bind="nuovaEmail" placeholder="mario.rossi@azienda.it" />
+        </div>
+        <div class="form-group">
+          <label>Ore ferie anno @DateTime.Now.Year</label>
+          <input type="number" @bind="nuoveOre" min="0" placeholder="Es. 160" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" @onclick="AggiungiDipendente">Aggiungi</button>
+          <button class="btn-cancel" @onclick="() => mostraModalNuovo = false">Annulla</button>
+        </div>
       </div>
     </div>
-  </div>
-}
+  }
+
+  @if (mostraModalAssegnaTutti)
+  {
+    <div class="modal-overlay">
+      <div class="modal">
+        <h3>Assegna ore a tutti i dipendenti</h3>
+        <p class="modal-subtitle">Sovrascrive il saldo ferie di tutti i dipendenti per l'anno @DateTime.Now.Year</p>
+        <div class="form-group">
+          <label>Ore totali ferie</label>
+          <input type="number" @bind="oreAssegnaTutti" min="0" placeholder="Es. 160" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" @onclick="AssegnaTutti">Assegna a tutti</button>
+          <button class="btn-cancel" @onclick="() => mostraModalAssegnaTutti = false">Annulla</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (mostraModalCsv)
+  {
+    <div class="modal-overlay">
+      <div class="modal">
+        <h3>Importa dipendenti da CSV</h3>
+        <p class="modal-subtitle">Formato: <code>Nome,Cognome,Email,OreFerie</code> (OreFerie opzionale, default 160)</p>
+        <div class="form-group">
+          <label>File CSV</label>
+          <InputFile OnChange="OnCsvFileSelected" accept=".csv" />
+        </div>
+        @if (csvRighe.Any())
+        {
+          <div class="form-group">
+            <p>Trovate <strong>@csvRighe.Count</strong> righe da importare.</p>
+            <div
+              style="max-height:150px;overflow-y:auto;font-size:0.85em;border:1px solid #ddd;border-radius:6px;padding:8px;">
+              @foreach (var r in csvRighe.Take(10))
+              {
+                <div>@r.Nome @r.Cognome — @r.Email — @r.OreFerie ore</div>
+              }
+              @if (csvRighe.Count > 10)
+              {
+                <div>...e altri @(csvRighe.Count - 10)</div>
+              }
+            </div>
+          </div>
+        }
+        @if (!string.IsNullOrEmpty(csvMessaggio))
+        {
+          <div class="alert @(csvErrore ? "alert-error" : "alert-success")">@csvMessaggio</div>
+        }
+        <div class="modal-actions">
+          <button class="btn-primary" @onclick="ImportaCsv" disabled="@(!csvRighe.Any() || csvImportando)">
+            @(csvImportando ? "Importazione..." : "Importa")
+          </button>
+          <button class="btn-cancel" @onclick="ChiudiModalCsv">Annulla</button>
+        </div>
+      </div>
+    </div>
+  }
 
 @code {
   record DipendenteViewModel(Utente Utente, SaldoFerie? Saldo);
@@ -220,14 +222,18 @@ else
   bool csvErrore = false;
   bool csvImportando = false;
 
-  protected override async Task OnInitializedAsync()
+  protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    if (!Auth.IsAuthenticated || !Auth.IsCapo)
+    if (firstRender)
     {
-      Nav.NavigateTo("/dashboard");
-      return;
+      if (!Auth.IsAuthenticated || !Auth.IsCapo)
+      {
+        Nav.NavigateTo("/dashboard");
+        return;
+      }
+      await CaricaDipendenti();
+      StateHasChanged();
     }
-    await CaricaDipendenti();
   }
 
   async Task CaricaDipendenti()
@@ -627,7 +633,8 @@ else
     }
 
     csvImportando = false;
-    csvMessaggio = $"Importati {importati} dipendenti" + (saltati > 0 ? $", {saltati} saltati (email già esistente)." : ".");
+    csvMessaggio = $"Importati {importati} dipendenti" + (saltati > 0 ? $", {saltati} saltati (email già esistente)." :
+".");
     csvErrore = false;
 
     _ = Task.Run(async () =>

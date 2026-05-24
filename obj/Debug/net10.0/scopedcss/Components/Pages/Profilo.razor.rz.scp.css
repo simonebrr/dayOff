@@ -1,29 +1,7 @@
-.page-header[b-wsa2t94zv3] {
-  margin-bottom: 1.5rem;
-}
-
-.page-header h2[b-wsa2t94zv3] {
-  font-size: 22px;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-
-.subtitle[b-wsa2t94zv3] {
-  color: #888;
-  font-size: 14px;
-}
-
 .grid-2[b-wsa2t94zv3] {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
-}
-
-.form-card[b-wsa2t94zv3] {
-  background: white;
-  border: 0.5px solid #e0e0e0;
-  border-radius: 12px;
-  padding: 1.5rem;
 }
 
 .form-card h3[b-wsa2t94zv3] {
@@ -56,6 +34,13 @@
   font-weight: 500;
 }
 
+.info-muted[b-wsa2t94zv3] {
+  font-size: 13px;
+  color: #aaa;
+  font-weight: 400;
+  font-style: italic;
+}
+
 .role-badge[b-wsa2t94zv3] {
   font-size: 11px;
   padding: 3px 10px;
@@ -73,66 +58,43 @@
   color: #185FA5;
 }
 
-.form-group[b-wsa2t94zv3] {
-  margin-bottom: 1rem;
-}
-
-.form-group label[b-wsa2t94zv3] {
-  display: block;
-  font-size: 13px;
-  color: #555;
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-
-.form-group input[b-wsa2t94zv3] {
-  width: 100%;
-  padding: 10px 12px;
-  border: 0.5px solid #ddd;
-  border-radius: 8px;
-  font-size: 14px;
-  outline: none;
-  font-family: inherit;
-}
-
-.form-group input:focus[b-wsa2t94zv3] {
-  border-color: #1D9E75;
-}
-
-.btn-primary[b-wsa2t94zv3] {
-  padding: 10px 24px;
-  background: #1D9E75;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  margin-top: 0.5rem;
-}
-
-.btn-primary:hover[b-wsa2t94zv3] {
-  background: #0F6E56;
-}
-
-.alert[b-wsa2t94zv3] {
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 14px;
+/* Stat cards (solo capo) */
+.stats-row[b-wsa2t94zv3] {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
-.alert-success[b-wsa2t94zv3] {
-  background: #E1F5EE;
-  color: #0F6E56;
+.stat-card[b-wsa2t94zv3] {
+  background: white;
+  border: 0.5px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
 }
 
-.alert-error[b-wsa2t94zv3] {
-  background: #FCEBEB;
-  color: #A32D2D;
+.stat-label[b-wsa2t94zv3] {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.stat-value[b-wsa2t94zv3] {
+  font-size: 26px;
+  font-weight: 600;
+  color: #222;
+}
+
+.stat-value.warning[b-wsa2t94zv3] {
+  color: #B45309;
 }
 
 @media (max-width: 600px) {
   .grid-2[b-wsa2t94zv3] {
     grid-template-columns: 1fr;
+  }
+
+  .stats-row[b-wsa2t94zv3] {
+    grid-template-columns: 1fr 1fr;
   }
 }

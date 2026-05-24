@@ -56,18 +56,22 @@ else
 @code {
   List<RichiestaFerie> richieste = new();
 
-  protected override async Task OnInitializedAsync()
+  protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    if (!Auth.IsAuthenticated)
+    if (firstRender)
     {
-      Nav.NavigateTo("/login");
-      return;
+      if (!Auth.IsAuthenticated)
+      {
+        Nav.NavigateTo("/login");
+        return;
+      }
+      using var db = DbFactory.CreateDbContext();
+      richieste = await db.RichiestaFerie
+          .Where(r => r.UtenteId == Auth.UtenteId)
+          .OrderByDescending(r => r.DataRichiesta)
+          .ToListAsync();
+      StateHasChanged();
     }
-    using var db = DbFactory.CreateDbContext();
-    richieste = await db.RichiestaFerie
-        .Where(r => r.UtenteId == Auth.UtenteId)
-        .OrderByDescending(r => r.DataRichiesta)
-        .ToListAsync();
   }
 
   string GetStatoBadge(StatoRichiesta stato) => stato switch

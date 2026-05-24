@@ -12,7 +12,8 @@ builder.Services.AddRazorComponents()
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlite("Data Source=gestioneferie.db"));
 
-builder.Services.AddSingleton<AuthService>();
+builder.Services.AddScoped<SessionService>();
+builder.Services.AddScoped<AuthService>();
 builder.Services.AddHttpClient();
 builder.Services.AddApexCharts();
 builder.Services.AddScoped<EmailService>();

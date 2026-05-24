@@ -34,6 +34,10 @@ build_property.EnableCodeStyleSeverity =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9BcHAucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/Admin.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9BZG1pbi5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [/home/simo/Desktop/GestioneFerie/GestioneFerie.Web/Components/Pages/Logout.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9Mb2dvdXQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 

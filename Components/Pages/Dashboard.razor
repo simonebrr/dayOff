@@ -259,19 +259,23 @@ else
     Colors = new List<string> { "#F09595", "#1D9E75" }
   };
 
-  protected override async Task OnInitializedAsync()
+  protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    if (!Auth.IsAuthenticated)
+    if (firstRender)
     {
-      Nav.NavigateTo("/login");
-      return;
+      if (!Auth.IsAuthenticated)
+      {
+        Nav.NavigateTo("/login");
+        return;
+      }
+      if (Auth.IsSuperAdmin)
+      {
+        Nav.NavigateTo("/admin");
+        return;
+      }
+      await CaricaDati();
+      StateHasChanged();
     }
-    if (Auth.IsSuperAdmin)
-    {
-      Nav.NavigateTo("/admin");
-      return;
-    }
-    await CaricaDati();
   }
 
   async Task CaricaDati()
@@ -286,7 +290,8 @@ else
     if (Auth.IsCapo)
     {
       totaleDipendenti = await db.Utenti.CountAsync(u => u.Ruolo == Ruolo.Dipendente && u.AziendaId == Auth.AziendaId);
-      richiesteInAttesa = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.InAttesa && r.Utente.AziendaId == Auth.AziendaId);
+      richiesteInAttesa = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.InAttesa && r.Utente.AziendaId ==
+Auth.AziendaId);
       richiesteApprovate = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.Approvata &&
         r.DataRichiesta.Month == ora.Month && r.Utente.AziendaId == Auth.AziendaId);
       richiesteRifiutate = await db.RichiestaFerie.CountAsync(r => r.Stato == StatoRichiesta.Rifiutata &&
@@ -443,9 +448,9 @@ DateTime.Now.Year);
   }
 
   async Task ConfermaRifiuto()
-{
-    mostraModalRifiuto = false;          // ← chiude subito
-    await InvokeAsync(StateHasChanged);  // ← aggiorna UI subito
+  {
+    mostraModalRifiuto = false; // ← chiude subito
+    await InvokeAsync(StateHasChanged); // ← aggiorna UI subito
 
     using var db = DbFactory.CreateDbContext();
     var richiesta = await db.RichiestaFerie.Include(r => r.Utente).FirstOrDefaultAsync(r => r.Id == richiestaRifiutoId);
@@ -471,7 +476,7 @@ DateTime.Now.Year);
     );
 
     await InvokeAsync(StateHasChanged);
-}
+  }
 
   string GetStatoBadge(StatoRichiesta stato) => stato switch
   {
