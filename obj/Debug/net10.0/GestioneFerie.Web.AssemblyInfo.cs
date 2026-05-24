@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GestioneFerie.Web")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3c45dca663d991afdf0ab98b902cd852866646b8")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0787a6eb4efdbcbd7a42824a7775c1437ce7c455")]
 [assembly: System.Reflection.AssemblyProductAttribute("GestioneFerie.Web")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GestioneFerie.Web")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

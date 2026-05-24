@@ -4,62 +4,51 @@
 @using GestioneFerie.Web.Services
 @implements IDisposable
 
-@if (!Auth.IsAuthenticated && !IsLoginPage)
-{
-  Nav.NavigateTo("/login");
-}
-else
-{
-  <div class="page">
-    @if (Auth.IsAuthenticated)
-    {
-      <nav class="navbar">
-        <div class="navbar-brand">🗓️ Gestione Ferie</div>
+<div class="page">
+  @if (Auth.IsAuthenticated)
+  {
+    <nav class="navbar">
+      <div class="navbar-brand">🗓️ Gestione Ferie</div>
 
-        <button class="hamburger" id="hamburger" onclick="toggleMenu()">
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
+      <button class="hamburger" id="hamburger" onclick="toggleMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
 
-        <div class="navbar-center" id="navbar-center">
-          @if (Auth.IsSuperAdmin)
+      <div class="navbar-center" id="navbar-center">
+        @if (Auth.IsSuperAdmin)
+        {
+          <a href="/admin" class="nav-link" onclick="closeMenu()">Admin</a>
+        }
+        else
+        {
+          <a href="/dashboard" class="nav-link" onclick="closeMenu()">Dashboard</a>
+          @if (Auth.IsCapo)
           {
-            <a href="/admin" class="nav-link" onclick="closeMenu()">Admin</a>
+            <a href="/dipendenti" class="nav-link" onclick="closeMenu()">Dipendenti</a>
+            <a href="/richieste" class="nav-link" onclick="closeMenu()">Richieste</a>
           }
           else
           {
-            <a href="/dashboard" class="nav-link" onclick="closeMenu()">Dashboard</a>
-            @if (Auth.IsCapo)
-            {
-              <a href="/dipendenti" class="nav-link" onclick="closeMenu()">Dipendenti</a>
-              <a href="/richieste" class="nav-link" onclick="closeMenu()">Richieste</a>
-            }
-            else
-            {
-              <a href="/nuova-richiesta" class="nav-link" onclick="closeMenu()">Nuova Richiesta</a>
-              <a href="/mie-richieste" class="nav-link" onclick="closeMenu()">Le mie richieste</a>
-            }
-            <a href="/calendario" class="nav-link" onclick="closeMenu()">Calendario</a>
-            <a href="/profilo" class="nav-link" onclick="closeMenu()">Profilo</a>
+            <a href="/nuova-richiesta" class="nav-link" onclick="closeMenu()">Nuova Richiesta</a>
+            <a href="/mie-richieste" class="nav-link" onclick="closeMenu()">Le mie richieste</a>
           }
-          <a href="/esci" class="nav-link nav-link-danger only-mobile" onclick="closeMenu()">Esci</a>
-        </div>
+          <a href="/calendario" class="nav-link" onclick="closeMenu()">Calendario</a>
+          <a href="/profilo" class="nav-link" onclick="closeMenu()">Profilo</a>
+        }
+        <a href="/esci" class="nav-link nav-link-danger only-mobile" onclick="closeMenu()">Esci</a>
+      </div>
 
-        <div class="navbar-right">
-          @* <span class="user-name">@Auth.UtenteNome</span>
-          <span class="role-badge @(Auth.IsCapo ? "badge-capo" : "badge-dipendente")">
-            @(Auth.IsCapo ? "Capo" : "Dipendente")
-          </span>*@
-          <a href="/esci" class="btn-logout only-desktop">Esci</a>
-        </div>
-      </nav>
-    }
-    <main class="main-content">
-      @Body
-    </main>
-  </div>
-}
+      <div class="navbar-right">
+        <a href="/esci" class="btn-logout only-desktop">Esci</a>
+      </div>
+    </nav>
+  }
+  <main class="main-content">
+    @Body
+  </main>
+</div>
 
 @code {
   bool IsLoginPage => Nav.Uri.Contains("/login");
@@ -67,6 +56,11 @@ else
   protected override void OnInitialized()
   {
     Auth.OnChange += AggiornaPagina;
+
+    if (!Auth.IsAuthenticated && !IsLoginPage)
+    {
+      Nav.NavigateTo("/login");
+    }
   }
 
   void AggiornaPagina() => InvokeAsync(StateHasChanged);

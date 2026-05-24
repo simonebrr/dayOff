@@ -150,7 +150,6 @@ else
   {
     if (firstRender)
     {
-      await Auth.LoadSessionAsync();
       if (!Auth.IsAuthenticated || !Auth.IsSuperAdmin)
       {
         Nav.NavigateTo("/login");

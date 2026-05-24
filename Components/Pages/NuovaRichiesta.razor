@@ -143,6 +143,28 @@
   </div>
 </div>
 
+@if (richiedeAutorizzazione)
+{
+  <div class="modal-overlay">
+    <div class="modal-box">
+      <h3>⚠️ Preavviso insufficiente</h3>
+      @{
+        var giorniMancanti = (int)(dataInizio.Date - DateTime.Today.Date).TotalDays;
+        var giorniTesto = giorniMancanti == 1 ? "1 giorno" : $"{giorniMancanti} giorni";
+      }
+      <p>Stai richiedendo <strong>@tipo</strong> con solo <strong>@giorniTesto di preavviso</strong> (minimo richiesto: 4
+        giorni).</p>
+        <p>La richiesta verrà comunque inviata al capo, che potrà approvarla o rifiutarla.</p>
+        <p style="color:#888; font-size:0.9rem">In alternativa, contatta direttamente <strong>@nomeCapo</strong> per
+          accordarti.</p>
+          <div class="modal-actions">
+            <button class="btn-primary" @onclick="InviaConAutorizzazione">Invia comunque</button>
+            <button class="btn-cancel" @onclick="() => richiedeAutorizzazione = false">Annulla</button>
+          </div>
+        </div>
+      </div>
+    }
+
 @code {
   string tipo = "Ferie";
   DateTime dataInizio = DateTime.Today;
@@ -154,6 +176,8 @@
   string messaggio = "";
   bool successo = false;
   bool caricamento = false;
+  bool richiedeAutorizzazione = false;
+  string nomeCapo = "";
   SaldoFerie? saldo;
   HashSet<DateTime> festiviCache = new();
   int anniCacheati = 0;
@@ -170,6 +194,11 @@
       using var db = DbFactory.CreateDbContext();
       saldo = await db.SaldoFerie.FirstOrDefaultAsync(s =>
           s.UtenteId == Auth.UtenteId && s.Anno == DateTime.Now.Year);
+
+      var capo = await db.Utenti
+          .FirstOrDefaultAsync(u => u.Ruolo == Ruolo.Capo && u.AziendaId == Auth.AziendaId);
+      nomeCapo = capo != null ? $"{capo.Nome} {capo.Cognome}" : "il tuo responsabile";
+
       await CalcolaOre();
       StateHasChanged();
     }
@@ -188,18 +217,18 @@
   HashSet<DateTime> GetFestiviFissi(int anno)
   {
     var festivi = new HashSet<DateTime>
-        {
-            new DateTime(anno, 1, 1),
-            new DateTime(anno, 1, 6),
-            new DateTime(anno, 4, 25),
-            new DateTime(anno, 5, 1),
-            new DateTime(anno, 6, 2),
-            new DateTime(anno, 8, 15),
-            new DateTime(anno, 11, 1),
-            new DateTime(anno, 12, 8),
-            new DateTime(anno, 12, 25),
-            new DateTime(anno, 12, 26),
-        };
+    {
+      new DateTime(anno, 1, 1),
+      new DateTime(anno, 1, 6),
+      new DateTime(anno, 4, 25),
+      new DateTime(anno, 5, 1),
+      new DateTime(anno, 6, 2),
+      new DateTime(anno, 8, 15),
+      new DateTime(anno, 11, 1),
+      new DateTime(anno, 12, 8),
+      new DateTime(anno, 12, 25),
+      new DateTime(anno, 12, 26),
+    };
     var pasqua = CalcolaPasqua(anno);
     festivi.Add(pasqua);
     festivi.Add(pasqua.AddDays(1));
@@ -268,6 +297,28 @@
       successo = false;
       return;
     }
+
+    // Controllo preavviso 4 giorni (solo per Ferie e Permesso)
+    if (tipo != "Malattia" && (dataInizio.Date - DateTime.Today.Date).TotalDays < 4)
+    {
+      richiedeAutorizzazione = true;
+      messaggio = "";
+      successo = false;
+      StateHasChanged();
+      return;
+    }
+
+    await EseguiInvio();
+  }
+
+  async Task InviaConAutorizzazione()
+  {
+    richiedeAutorizzazione = false;
+    await EseguiInvio();
+  }
+
+  async Task EseguiInvio()
+  {
     if (tipo == "Malattia" && string.IsNullOrWhiteSpace(codiceMalattia))
     {
       messaggio = "Inserisci il codice malattia.";
@@ -317,36 +368,42 @@
             emailDestinatario,
             $"🤒 Segnalazione malattia - {Auth.UtenteNome}",
             $"""
-            <p>Il dipendente <strong>{Auth.UtenteNome}</strong> ha segnalato una malattia.</p>
-            <p>Codice malattia: <strong>{codiceMalattia}</strong></p>
-            <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
-            <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
-            <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
-            """
+          <p>Il dipendente <strong>{Auth.UtenteNome}</strong> ha segnalato una malattia.</p>
+          <p>Codice malattia: <strong>{codiceMalattia}</strong></p>
+          <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
+          <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
+          <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
+          """
         );
       }
       messaggio = "Malattia segnalata! Il codice è stato inviato all'ufficio HR.";
     }
     else
     {
-      var capi = await db.Utenti
-          .Where(u => u.Ruolo == Ruolo.Capo)
-          .ToListAsync();
+      using var dbCapo = DbFactory.CreateDbContext();
+      var capo = await dbCapo.Utenti
+          .FirstOrDefaultAsync(u => u.Ruolo == Ruolo.Capo && u.AziendaId == Auth.AziendaId);
 
-      foreach (var capo in capi)
+      if (capo != null)
       {
+        var giorniPreavviso = (dataInizio.Date - DateTime.Today.Date).TotalDays;
+        var avvisoPreavviso = giorniPreavviso < 4
+            ? "<p>⚠️ Richiesta con meno di 4 giorni di preavviso.</p>"
+            : "";
+
         await EmailService.InviaAsync(
             capo.Email,
             $"📋 Nuova richiesta di {tipo} - {Auth.UtenteNome}",
             $"""
-                    <p>Il dipendente <strong>{Auth.UtenteNome}</strong> ha inviato una nuova richiesta.</p>
-                    <p>Tipo: <strong>{tipo}</strong></p>
-                    <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
-                    <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
-                    <p>Ore: <strong>{ore}</strong></p>
-                    <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
-                    <p>Accedi al pannello per approvare o rifiutare.</p>
-                    """
+          <p>Il dipendente <strong>{Auth.UtenteNome}</strong> ha inviato una nuova richiesta.</p>
+          <p>Tipo: <strong>{tipo}</strong></p>
+          <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
+          <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
+          <p>Ore: <strong>{ore}</strong></p>
+          <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
+          {avvisoPreavviso}
+          <p>Accedi al pannello per approvare o rifiutare.</p>
+          """
         );
       }
       messaggio = "Richiesta inviata con successo! Il capo la esaminerà a breve.";
@@ -354,18 +411,12 @@
 
     successo = true;
     caricamento = false;
+    richiedeAutorizzazione = false;
     tipo = "Ferie";
     dataInizio = DateTime.Today;
     dataFine = DateTime.Today;
     note = "";
     codiceMalattia = "";
     await CalcolaOre();
-  }
-
-  class PublicHoliday
-  {
-    public DateTime Date { get; set; }
-    public string LocalName { get; set; } = "";
-    public string Name { get; set; } = "";
   }
 }

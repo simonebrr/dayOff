@@ -1,8 +1,7 @@
 @page "/login"
-@inject AuthService Auth
 @inject NavigationManager Nav
+@inject AuthService Auth
 @using GestioneFerie.Web.Services
-@rendermode InteractiveServer
 
 <PageTitle>Login</PageTitle>
 
@@ -13,68 +12,34 @@
       <p>Accedi al tuo account</p>
     </div>
 
-    @if (!string.IsNullOrEmpty(errore))
+    @if (Nav.Uri.Contains("error=1"))
     {
-      <div class="alert-error">@errore</div>
+      <div class="alert-error">Email o password non corretti.</div>
     }
 
-    <div class="form-group">
-      <label>Email</label>
-      <input type="email" @bind="email" placeholder="tuaemail@azienda.it" />
-    </div>
-
-    <div class="form-group">
-      <label>Password</label>
-      <input type="password" @bind="password" placeholder="••••••••" />
-    </div>
-
-    <button class="btn-login" @onclick="Accedi" disabled="@caricamento">
-      @if (caricamento)
-      {
-        <span>Accesso in corso...</span>
-      }
-      else
-      {
-
-        <span>Accedi</span>
-      }
-    </button>
+    <form method="post" action="/auth/login">
+      <input name="__RequestVerificationToken" type="hidden" value="@antiforgery" />
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" name="email" placeholder="tuaemail@azienda.it" required />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="••••••••" required />
+      </div>
+      <button type="submit" class="btn-login">Accedi</button>
+    </form>
   </div>
 </div>
 
 @code {
-  string email = "";
-  string password = "";
-  string errore = "";
-  bool caricamento = false;
+  string antiforgery = "";
 
-  async Task Accedi()
+  protected override void OnInitialized()
   {
-    caricamento = true;
-    errore = "";
-    StateHasChanged();
-
-    try
+    if (Auth.IsAuthenticated)
     {
-      var (successo, messaggio) = await Auth.LoginAsync(email, password);
-
-      if (successo)
-      {
-        Nav.NavigateTo(Auth.IsSuperAdmin ? "/admin" : "/dashboard", forceLoad: true);
-      }
-      else
-      {
-        errore = messaggio;
-      }
-    }
-    catch (Exception ex)
-    {
-      errore = $"Errore inatteso: {ex.Message}";
-    }
-    finally
-    {
-      caricamento = false;
-      StateHasChanged();
+      Nav.NavigateTo(Auth.IsSuperAdmin ? "/admin" : "/dashboard");
     }
   }
 }
