@@ -216,7 +216,6 @@ else
 
     using var db = DbFactory.CreateDbContext();
 
-    // Prendi tutti gli utenti dell'azienda
     var utenti = await db.Utenti
         .Where(u => u.AziendaId == aziendaDaEliminare.Id)
         .ToListAsync();
@@ -228,20 +227,31 @@ else
         .Where(r => utenteIds.Contains(r.UtenteId))
         .ToListAsync();
     db.RichiestaFerie.RemoveRange(richieste);
+    await db.SaveChangesAsync();
 
     // Elimina saldi
     var saldi = await db.SaldoFerie
         .Where(s => utenteIds.Contains(s.UtenteId))
         .ToListAsync();
     db.SaldoFerie.RemoveRange(saldi);
+    await db.SaveChangesAsync();
 
     // Elimina log
     var log = await db.LogModificheSaldo
         .Where(l => utenteIds.Contains(l.UtenteId))
         .ToListAsync();
     db.LogModificheSaldo.RemoveRange(log);
+    await db.SaveChangesAsync();
 
-    // Scollega utenti dall'azienda prima di eliminarla
+    // Prima togli CapoId dall'azienda
+    var azienda = await db.Aziende.FindAsync(aziendaDaEliminare.Id);
+    if (azienda != null)
+    {
+      azienda.CapoId = null;
+      await db.SaveChangesAsync();
+    }
+
+    // Scollega utenti dall'azienda
     foreach (var u in utenti)
       u.AziendaId = null;
     await db.SaveChangesAsync();
@@ -251,9 +261,11 @@ else
     await db.SaveChangesAsync();
 
     // Elimina azienda
-    var azienda = await db.Aziende.FindAsync(aziendaDaEliminare.Id);
-    if (azienda != null) db.Aziende.Remove(azienda);
-    await db.SaveChangesAsync();
+    if (azienda != null)
+    {
+      db.Aziende.Remove(azienda);
+      await db.SaveChangesAsync();
+    }
 
     messaggio = $"Azienda \"{aziendaDaEliminare.Nome}\" eliminata.";
     errore = false;
