@@ -24,6 +24,13 @@ builder.Services.AddServerSideBlazor(options =>
   options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(30);
 });
 
+// Fix cookie per Safari/iPhone
+builder.Services.Configure<CookiePolicyOptions>(options =>
+{
+  options.MinimumSameSitePolicy = SameSiteMode.None;
+  options.Secure = CookieSecurePolicy.Always;
+});
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -32,11 +39,19 @@ if (!app.Environment.IsDevelopment())
   app.UseHsts();
 }
 
-app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseCookiePolicy(); // <-- importante, deve stare prima di UseAntiforgery
 app.UseAntiforgery();
 
-// Endpoint login/logout via cookie HTTP
+// Fix header ngrok per Safari
+app.Use(async (ctx, next) =>
+{
+  ctx.Request.Headers["ngrok-skip-browser-warning"] = "true";
+  await next();
+});
+
+app.MapGet("/", () => Results.Redirect("/login"));
+
 app.MapPost("/auth/login", async (HttpContext ctx,
     IDbContextFactory<AppDbContext> dbFactory) =>
 {
@@ -49,14 +64,18 @@ app.MapPost("/auth/login", async (HttpContext ctx,
   if (utente == null || !BCrypt.Net.BCrypt.Verify(password, utente.PasswordHash))
     return Results.Redirect("/login?error=1");
 
-  ctx.Response.Cookies.Append("uid", utente.Id.ToString(),
-      new CookieOptions { HttpOnly = true, SameSite = SameSiteMode.Strict, MaxAge = TimeSpan.FromDays(7) });
-  ctx.Response.Cookies.Append("unome", utente.Nome,
-      new CookieOptions { HttpOnly = true, SameSite = SameSiteMode.Strict, MaxAge = TimeSpan.FromDays(7) });
-  ctx.Response.Cookies.Append("uruolo", utente.Ruolo.ToString(),
-      new CookieOptions { HttpOnly = true, SameSite = SameSiteMode.Strict, MaxAge = TimeSpan.FromDays(7) });
-  ctx.Response.Cookies.Append("uazienda", (utente.AziendaId ?? 0).ToString(),
-      new CookieOptions { HttpOnly = true, SameSite = SameSiteMode.Strict, MaxAge = TimeSpan.FromDays(7) });
+  var cookieOptions = new CookieOptions
+  {
+    HttpOnly = true,
+    SameSite = SameSiteMode.None,
+    Secure = true,
+    MaxAge = TimeSpan.FromDays(7)
+  };
+
+  ctx.Response.Cookies.Append("uid", utente.Id.ToString(), cookieOptions);
+  ctx.Response.Cookies.Append("unome", utente.Nome, cookieOptions);
+  ctx.Response.Cookies.Append("uruolo", utente.Ruolo.ToString(), cookieOptions);
+  ctx.Response.Cookies.Append("uazienda", (utente.AziendaId ?? 0).ToString(), cookieOptions);
 
   var redirect = utente.Ruolo.ToString() == "SuperAdmin" ? "/admin" : "/dashboard";
   return Results.Redirect(redirect);
