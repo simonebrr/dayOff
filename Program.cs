@@ -6,7 +6,7 @@ using ApexCharts;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "5233";
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 builder.Services.AddRazorComponents()
@@ -35,22 +35,10 @@ builder.Services.Configure<CookiePolicyOptions>(options =>
 
 var app = builder.Build();
 
-if (!app.Environment.IsDevelopment())
-{
-  app.UseExceptionHandler("/Error");
-  app.UseHsts();
-}
-
-app.UseWebSockets();
 app.UseStaticFiles();
 app.UseCookiePolicy();
 app.UseAntiforgery();
-
-app.Use(async (ctx, next) =>
-{
-  ctx.Request.Headers["ngrok-skip-browser-warning"] = "true";
-  await next();
-});
+app.UseWebSockets();
 
 app.MapGet("/", () => Results.Redirect("/login"));
 
