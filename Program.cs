@@ -3,6 +3,7 @@ using GestioneFerie.Web.Data;
 using GestioneFerie.Web.Services;
 using Microsoft.EntityFrameworkCore;
 using ApexCharts;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,12 +34,20 @@ builder.Services.Configure<CookiePolicyOptions>(options =>
   options.Secure = CookieSecurePolicy.Always;
 });
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+  options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+  options.KnownNetworks.Clear();
+  options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
 
+app.UseForwardedHeaders();
+app.UseWebSockets();
 app.UseStaticFiles();
 app.UseCookiePolicy();
 app.UseAntiforgery();
-app.UseWebSockets();
 
 app.MapGet("/", () => Results.Redirect("/login"));
 

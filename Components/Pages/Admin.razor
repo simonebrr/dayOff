@@ -53,6 +53,7 @@ else
             <td>@conteggioUtenti.GetValueOrDefault(a.Id)</td>
             <td>
               <button class="btn-edit" @onclick="() => ApriModifica(a)">✏️ Modifica</button>
+              <button class="btn-danger" @onclick="() => ApriConfermaElimina(a)">🗑️ Elimina</button>
             </td>
           </tr>
         }
@@ -127,6 +128,22 @@ else
   </div>
 }
 
+@if (mostraConfermaElimina)
+{
+  <div class="modal-overlay">
+    <div class="modal">
+      <h3>Conferma eliminazione</h3>
+      <p>Sei sicuro di voler eliminare <strong>@aziendaDaEliminare?.Nome</strong>?</p>
+      <p style="color:#A32D2D; font-size:0.9rem">⚠️ Verranno eliminati anche tutti i dipendenti, le richieste e i saldi
+        ferie associati.</p>
+        <div class="modal-actions">
+          <button class="btn-danger" @onclick="ConfermaElimina">🗑️ Elimina definitivamente</button>
+          <button class="btn-cancel" @onclick="() => mostraConfermaElimina = false">Annulla</button>
+        </div>
+      </div>
+    </div>
+  }
+
 @code {
   List<GestioneFerie.Web.Models.Azienda> aziende = new();
   Dictionary<int, int> conteggioUtenti = new();
@@ -145,6 +162,9 @@ else
   int modificaAziendaId;
   string modificaNome = "";
   string modificaEmailMalattia = "";
+
+  bool mostraConfermaElimina = false;
+  GestioneFerie.Web.Models.Azienda? aziendaDaEliminare;
 
   protected override async Task OnAfterRenderAsync(bool firstRender)
   {
@@ -181,6 +201,64 @@ else
     modificaNome = a.Nome;
     modificaEmailMalattia = a.EmailMalattia ?? "";
     mostraModalModifica = true;
+  }
+
+  void ApriConfermaElimina(GestioneFerie.Web.Models.Azienda a)
+  {
+    aziendaDaEliminare = a;
+    mostraConfermaElimina = true;
+  }
+
+  async Task ConfermaElimina()
+  {
+    if (aziendaDaEliminare == null) return;
+    mostraConfermaElimina = false;
+
+    using var db = DbFactory.CreateDbContext();
+
+    // Prendi tutti gli utenti dell'azienda
+    var utenti = await db.Utenti
+        .Where(u => u.AziendaId == aziendaDaEliminare.Id)
+        .ToListAsync();
+
+    var utenteIds = utenti.Select(u => u.Id).ToList();
+
+    // Elimina richieste
+    var richieste = await db.RichiestaFerie
+        .Where(r => utenteIds.Contains(r.UtenteId))
+        .ToListAsync();
+    db.RichiestaFerie.RemoveRange(richieste);
+
+    // Elimina saldi
+    var saldi = await db.SaldoFerie
+        .Where(s => utenteIds.Contains(s.UtenteId))
+        .ToListAsync();
+    db.SaldoFerie.RemoveRange(saldi);
+
+    // Elimina log
+    var log = await db.LogModificheSaldo
+        .Where(l => utenteIds.Contains(l.UtenteId))
+        .ToListAsync();
+    db.LogModificheSaldo.RemoveRange(log);
+
+    // Scollega utenti dall'azienda prima di eliminarla
+    foreach (var u in utenti)
+      u.AziendaId = null;
+    await db.SaveChangesAsync();
+
+    // Elimina utenti
+    db.Utenti.RemoveRange(utenti);
+    await db.SaveChangesAsync();
+
+    // Elimina azienda
+    var azienda = await db.Aziende.FindAsync(aziendaDaEliminare.Id);
+    if (azienda != null) db.Aziende.Remove(azienda);
+    await db.SaveChangesAsync();
+
+    messaggio = $"Azienda \"{aziendaDaEliminare.Nome}\" eliminata.";
+    errore = false;
+    aziendaDaEliminare = null;
+    await CaricaAziende();
   }
 
   async Task SalvaModifica()
