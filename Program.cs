@@ -6,6 +6,9 @@ using ApexCharts;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5233";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -24,7 +27,6 @@ builder.Services.AddServerSideBlazor(options =>
   options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(30);
 });
 
-// Fix cookie per Safari/iPhone
 builder.Services.Configure<CookiePolicyOptions>(options =>
 {
   options.MinimumSameSitePolicy = SameSiteMode.None;
@@ -40,10 +42,9 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles();
-app.UseCookiePolicy(); // <-- importante, deve stare prima di UseAntiforgery
+app.UseCookiePolicy();
 app.UseAntiforgery();
 
-// Fix header ngrok per Safari
 app.Use(async (ctx, next) =>
 {
   ctx.Request.Headers["ngrok-skip-browser-warning"] = "true";
