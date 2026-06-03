@@ -134,15 +134,14 @@ else
     <div class="modal">
       <h3>Conferma eliminazione</h3>
       <p>Sei sicuro di voler eliminare <strong>@aziendaDaEliminare?.Nome</strong>?</p>
-      <p style="color:#A32D2D; font-size:0.9rem">⚠️ Verranno eliminati anche tutti i dipendenti, le richieste e i saldi
-        ferie associati.</p>
-        <div class="modal-actions">
-          <button class="btn-danger" @onclick="ConfermaElimina">🗑️ Elimina definitivamente</button>
-          <button class="btn-cancel" @onclick="() => mostraConfermaElimina = false">Annulla</button>
-        </div>
+      <p style="color:#A32D2D; font-size:0.9rem">⚠️ Verranno eliminati anche tutti i dipendenti, le richieste e i saldi ferie associati.</p>
+      <div class="modal-actions">
+        <button class="btn-danger" @onclick="ConfermaElimina">🗑️ Elimina definitivamente</button>
+        <button class="btn-cancel" @onclick="() => mostraConfermaElimina = false">Annulla</button>
       </div>
     </div>
-  }
+  </div>
+}
 
 @code {
   List<GestioneFerie.Web.Models.Azienda> aziende = new();
@@ -243,29 +242,17 @@ else
     db.LogModificheSaldo.RemoveRange(log);
     await db.SaveChangesAsync();
 
-    // Prima togli CapoId dall'azienda
+    // Elimina azienda PRIMA degli utenti
     var azienda = await db.Aziende.FindAsync(aziendaDaEliminare.Id);
-    if (azienda != null)
-    {
-      azienda.CapoId = null;
-      await db.SaveChangesAsync();
-    }
-
-    // Scollega utenti dall'azienda
-    foreach (var u in utenti)
-      u.AziendaId = null;
-    await db.SaveChangesAsync();
-
-    // Elimina utenti
-    db.Utenti.RemoveRange(utenti);
-    await db.SaveChangesAsync();
-
-    // Elimina azienda
     if (azienda != null)
     {
       db.Aziende.Remove(azienda);
       await db.SaveChangesAsync();
     }
+
+    // Ora elimina utenti
+    db.Utenti.RemoveRange(utenti);
+    await db.SaveChangesAsync();
 
     messaggio = $"Azienda \"{aziendaDaEliminare.Nome}\" eliminata.";
     errore = false;
