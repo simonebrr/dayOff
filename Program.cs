@@ -41,6 +41,7 @@ if (!app.Environment.IsDevelopment())
   app.UseHsts();
 }
 
+app.UseWebSockets();
 app.UseStaticFiles();
 app.UseCookiePolicy();
 app.UseAntiforgery();
