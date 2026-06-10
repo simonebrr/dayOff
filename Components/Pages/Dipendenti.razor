@@ -570,7 +570,11 @@ else
       if (string.IsNullOrWhiteSpace(nome) || string.IsNullOrWhiteSpace(email)) continue;
 
       decimal oreFerie = 160;
-      if (parts.Length >= 4 && decimal.TryParse(parts[3].Trim(), out var oreFromCsv))
+      if (parts.Length >= 4 && decimal.TryParse(
+              parts[3].Trim(),
+              System.Globalization.NumberStyles.Number,
+              System.Globalization.CultureInfo.InvariantCulture,
+              out var oreFromCsv))
         oreFerie = oreFromCsv;
 
       nuoveRighe.Add(new CsvRiga(nome, cognome, email, oreFerie));
