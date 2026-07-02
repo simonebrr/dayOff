@@ -2,7 +2,7 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject IDbContextFactory<AppDbContext> DbFactory
-@inject EmailService EmailService
+@inject RichiesteService Richieste
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @using GestioneFerie.Web.Data
@@ -67,7 +67,7 @@
           {
             <tr>
               <td>@r.Utente.Nome @r.Utente.Cognome</td>
-              <td><span class="badge @(r.Tipo == TipoRichiesta.Ferie ? "badge-ferie" : "badge-permesso")">@r.Tipo</span></td>
+              <td><span class="badge @BadgeHelper.TipoBadgeClass(r.Tipo)">@r.Tipo</span></td>
               <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
               <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
               <td>@r.OreRichieste</td>
@@ -206,11 +206,11 @@ else
           @foreach (var r in mieRichieste)
           {
             <tr>
-              <td><span class="badge @(r.Tipo == TipoRichiesta.Ferie ? "badge-ferie" : "badge-permesso")">@r.Tipo</span></td>
+              <td><span class="badge @BadgeHelper.TipoBadgeClass(r.Tipo)">@r.Tipo</span></td>
               <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
               <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
               <td>@r.OreRichieste</td>
-              <td><span class="badge @GetStatoBadge(r.Stato)">@r.Stato</span></td>
+              <td><span class="badge @BadgeHelper.StatoBadgeClass(r.Stato)">@r.Stato</span></td>
             </tr>
           }
         </tbody>
@@ -317,28 +317,7 @@ Auth.AziendaId);
 
       pocheOre = saldi.Where(s => s.OreDisponibili < 16).ToList();
 
-      oreDipendenti = saldi
-          .OrderBy(s => s.OreDisponibili)
-          .Take(5)
-          .Select(s => new OreDipendente
-          {
-            Nome = s.Utente.Nome,
-            OreUsate = (double)s.OreUsate,
-            OreDisponibili = (double)s.OreDisponibili
-          }).ToList();
-
-      var richiesteMese = await db.RichiestaFerie
-          .Where(r => r.DataRichiesta.Year == ora.Year && r.Utente.AziendaId == Auth.AziendaId)
-          .ToListAsync();
-
-      richiestePerMese = richiesteMese
-          .GroupBy(r => r.DataRichiesta.Month)
-          .OrderBy(g => g.Key)
-          .Select(g => new RichiestaMese
-          {
-            Mese = new DateTime(ora.Year, g.Key, 1).ToString("MMM"),
-            Conteggio = g.Count()
-          }).ToList();
+      (oreDipendenti, richiestePerMese) = await CaricaGraficiCapoAsync(db, ora);
     }
     else
     {
@@ -371,14 +350,20 @@ Auth.AziendaId);
     await Task.Delay(50); // ← da tempo a Blazor di fare il render senza grafici
 
     using var db = DbFactory.CreateDbContext();
-    var ora = DateTime.Now;
+    (oreDipendenti, richiestePerMese) = await CaricaGraficiCapoAsync(db, DateTime.Now);
 
+    graficiVisibili = true;
+    await InvokeAsync(StateHasChanged);
+  }
+
+  async Task<(List<OreDipendente>, List<RichiestaMese>)> CaricaGraficiCapoAsync(AppDbContext db, DateTime ora)
+  {
     var saldi = await db.SaldoFerie
         .Include(s => s.Utente)
         .Where(s => s.Anno == ora.Year && s.Utente.AziendaId == Auth.AziendaId)
         .ToListAsync();
 
-    oreDipendenti = saldi
+    var oreDip = saldi
         .OrderBy(s => s.OreDisponibili)
         .Take(5)
         .Select(s => new OreDipendente
@@ -392,7 +377,7 @@ Auth.AziendaId);
         .Where(r => r.DataRichiesta.Year == ora.Year && r.Utente.AziendaId == Auth.AziendaId)
         .ToListAsync();
 
-    richiestePerMese = richiesteMese
+    var perMese = richiesteMese
         .GroupBy(r => r.DataRichiesta.Month)
         .OrderBy(g => g.Key)
         .Select(g => new RichiestaMese
@@ -401,21 +386,13 @@ Auth.AziendaId);
           Conteggio = g.Count()
         }).ToList();
 
-    graficiVisibili = true;
-    await InvokeAsync(StateHasChanged);
+    return (oreDip, perMese);
   }
 
   async Task Approva(int id)
   {
-    using var db = DbFactory.CreateDbContext();
-    var richiesta = await db.RichiestaFerie.Include(r => r.Utente).FirstOrDefaultAsync(r => r.Id == id);
+    var richiesta = await Richieste.ApprovaAsync(id);
     if (richiesta == null) return;
-
-    richiesta.Stato = StatoRichiesta.Approvata;
-    var saldoDip = await db.SaldoFerie.FirstOrDefaultAsync(s => s.UtenteId == richiesta.UtenteId && s.Anno ==
-DateTime.Now.Year);
-    if (saldoDip != null) saldoDip.OreUsate += richiesta.OreRichieste;
-    await db.SaveChangesAsync();
 
     richiesteAttesa.RemoveAll(r => r.Id == id);
     richiesteInAttesa--;
@@ -424,17 +401,6 @@ DateTime.Now.Year);
     var oggi = DateTime.Today;
     if (richiesta.DataInizio <= oggi && richiesta.DataFine >= oggi)
       inFerieOggi.Add(richiesta);
-
-    await EmailService.InviaAsync(
-        richiesta.Utente.Email,
-        "La tua richiesta ferie è stata approvata ✅",
-        $"""
-        <p>Ciao {richiesta.Utente.Nome},</p>
-        <p>La tua richiesta di <strong>{richiesta.Tipo}</strong> dal <strong>{richiesta.DataInizio:dd/MM/yyyy}</strong> al <strong>{richiesta.DataFine:dd/MM/yyyy}</strong> è stata <strong>approvata</strong>.</p>
-        <p>Ore scalate: <strong>{richiesta.OreRichieste}</strong></p>
-        <p>Il team HR</p>
-        """
-    );
 
     await InvokeAsync(StateHasChanged);
     await AggiornaGrafici();
@@ -452,46 +418,13 @@ DateTime.Now.Year);
     mostraModalRifiuto = false; // ← chiude subito
     await InvokeAsync(StateHasChanged); // ← aggiorna UI subito
 
-    using var db = DbFactory.CreateDbContext();
-    var richiesta = await db.RichiestaFerie.Include(r => r.Utente).FirstOrDefaultAsync(r => r.Id == richiestaRifiutoId);
+    var richiesta = await Richieste.RifiutaAsync(richiestaRifiutoId, motivoRifiuto);
     if (richiesta == null) return;
-
-    richiesta.Stato = StatoRichiesta.Rifiutata;
-    richiesta.MotivoRifiuto = motivoRifiuto;
-    await db.SaveChangesAsync();
 
     richiesteAttesa.RemoveAll(r => r.Id == richiestaRifiutoId);
     richiesteInAttesa--;
     richiesteRifiutate++;
 
-    await EmailService.InviaAsync(
-        richiesta.Utente.Email,
-        "La tua richiesta ferie è stata rifiutata ❌",
-        $"""
-        <p>Ciao {richiesta.Utente.Nome},</p>
-        <p>La tua richiesta di <strong>{richiesta.Tipo}</strong> dal <strong>{richiesta.DataInizio:dd/MM/yyyy}</strong> al <strong>{richiesta.DataFine:dd/MM/yyyy}</strong> è stata <strong>rifiutata</strong>.</p>
-        <p>Motivo: <strong>{motivoRifiuto}</strong></p>
-        <p>Il team HR</p>
-        """
-    );
-
     await InvokeAsync(StateHasChanged);
   }
-
-  string GetStatoBadge(StatoRichiesta stato) => stato switch
-  {
-    StatoRichiesta.Approvata => "badge-success",
-    StatoRichiesta.Rifiutata => "badge-danger",
-    _ => "badge-warning"
-  };
-
-  class OreDipendente
-  {
-    public string Nome { get; set; } = ""; public double OreUsate { get; set; }
-    public double
-OreDisponibili
-    { get; set; }
-  }
-  class RichiestaMese { public string Mese { get; set; } = ""; public int Conteggio { get; set; } }
-  class SaldoItem { public string Label { get; set; } = ""; public double Valore { get; set; } }
 }

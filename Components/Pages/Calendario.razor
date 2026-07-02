@@ -3,7 +3,7 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject IConfiguration _config
-@inject EmailService EmailService
+@inject RichiesteService Richieste
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @using GestioneFerie.Web.Data
@@ -11,88 +11,6 @@
 @rendermode InteractiveServer
 
 <PageTitle>Calendario</PageTitle>
-
-<style>
-  .modal-overlay {
-    position: fixed !important;
-    inset: 0 !important;
-    background: rgba(0, 0, 0, 0.5) !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    z-index: 99999 !important;
-  }
-
-  .modal-box {
-    background: white;
-    border-radius: 16px;
-    padding: 2rem;
-    width: 90%;
-    max-width: 460px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .modal-box h3 {
-    font-size: 1.2rem;
-    font-weight: 700;
-    margin: 0;
-  }
-
-  .modal-box p {
-    color: #555;
-    margin: 0;
-    font-size: 0.95rem;
-  }
-
-  .modal-box .modal-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 0.5rem;
-  }
-
-  .modal-warning {
-    background: #fff8e1;
-    border-left: 4px solid #f59e0b;
-    padding: 0.6rem 1rem;
-    border-radius: 6px;
-    color: #92400e;
-    font-size: 0.9rem;
-  }
-
-  .btn-elimina {
-    background: transparent;
-    color: #e53e3e;
-    border: 1.5px solid #e53e3e;
-    padding: 0.4rem 1rem;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: background 0.2s, color 0.2s;
-  }
-
-  .btn-elimina:hover {
-    background: #e53e3e;
-    color: white;
-  }
-
-  .btn-cancel {
-    background: transparent;
-    color: #666;
-    border: 1.5px solid #ddd;
-    padding: 0.4rem 1rem;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-
-  .btn-cancel:hover {
-    background: #f5f5f5;
-  }
-</style>
 
 <div class="page-header">
   <h2>Calendario ferie</h2>
@@ -190,15 +108,14 @@ else
               <td>@r.Utente.Nome @r.Utente.Cognome</td>
             }
             <td>
-              <span
-                class="badge @(r.Tipo == TipoRichiesta.Ferie ? "badge-ferie" : r.Tipo == TipoRichiesta.Permesso ? "badge-permesso" : "badge-malattia")">
+              <span class="badge @BadgeHelper.TipoBadgeClass(r.Tipo)">
                 @r.Tipo
               </span>
             </td>
             <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
             <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
             <td>@r.OreRichieste</td>
-            <td><span class="badge @GetStatoBadge(r.Stato)">@r.Stato</span></td>
+            <td><span class="badge @BadgeHelper.StatoBadgeClass(r.Stato)">@r.Stato</span></td>
             <td>@(r.Note ?? "—")</td>
             @if (!Auth.IsCapo)
             {
@@ -289,25 +206,7 @@ else
 
   async Task CancellaScaduteInAttesa()
   {
-    using var db = DbFactory.CreateDbContext();
-    var oggi = DateTime.Today;
-
-    IQueryable<RichiestaFerie> query = db.RichiestaFerie
-        .Include(r => r.Utente)
-        .Where(r => r.Stato == StatoRichiesta.InAttesa && r.DataInizio < oggi);
-
-    if (Auth.IsCapo)
-      query = query.Where(r => r.Utente.AziendaId == Auth.AziendaId);
-    else
-      query = query.Where(r => r.UtenteId == Auth.UtenteId);
-
-    var scadute = await query.ToListAsync();
-
-    if (scadute.Any())
-    {
-      db.RichiestaFerie.RemoveRange(scadute);
-      await db.SaveChangesAsync();
-    }
+    await Richieste.RimuoviScaduteInAttesaAsync(Auth.IsCapo ? Auth.AziendaId : null, Auth.IsCapo ? null : Auth.UtenteId);
   }
 
   async Task CaricaRichieste()
@@ -360,50 +259,14 @@ else
     mostraConfermaElimina = false;
     await InvokeAsync(StateHasChanged);
 
-    using var db = DbFactory.CreateDbContext();
-    var richiesta = await db.RichiestaFerie
-        .Include(r => r.Utente)
-        .FirstOrDefaultAsync(r => r.Id == richiestaEliminaId);
+    var emailHR = _config["EmailHR"];
+    var richiesta = await Richieste.EliminaAsync(richiestaEliminaId, emailHR);
     if (richiesta == null) return;
-
-    if (richiesta.Stato == StatoRichiesta.Approvata)
-    {
-      var saldo = await db.SaldoFerie.FirstOrDefaultAsync(s =>
-          s.UtenteId == richiesta.UtenteId && s.Anno == DateTime.Now.Year);
-      if (saldo != null) saldo.OreUsate -= richiesta.OreRichieste;
-    }
-
-    db.RichiestaFerie.Remove(richiesta);
-    await db.SaveChangesAsync();
-
-    var emailHR = _config["Email"] ?? "";
-    if (!string.IsNullOrEmpty(emailHR))
-    {
-      var emailService = EmailService;
-      _ = Task.Run(() => emailService.InviaAsync(
-          emailHR,
-          $"🗑️ {richiesta.Utente.Nome} ha eliminato una richiesta",
-          $"""
-          <p><strong>{richiesta.Utente.Nome} {richiesta.Utente.Cognome}</strong> ha eliminato la seguente richiesta:</p>
-          <p>Tipo: <strong>{richiesta.Tipo}</strong></p>
-          <p>Dal: <strong>{richiesta.DataInizio:dd/MM/yyyy}</strong> al <strong>{richiesta.DataFine:dd/MM/yyyy}</strong></p>
-          <p>Ore: <strong>{richiesta.OreRichieste}</strong></p>
-          <p>Stato precedente: <strong>{richiesta.Stato}</strong></p>
-          """
-      ));
-    }
 
     tutteLeRichieste.RemoveAll(r => r.Id == richiestaEliminaId);
     Filtra();
     await InvokeAsync(StateHasChanged);
   }
-
-  string GetStatoBadge(StatoRichiesta stato) => stato switch
-  {
-    StatoRichiesta.Approvata => "badge-success",
-    StatoRichiesta.Rifiutata => "badge-danger",
-    _ => "badge-warning"
-  };
 
   void OnFocusDipendente()
   {

@@ -1,9 +1,8 @@
 @page "/richieste"
 @inject IDbContextFactory<AppDbContext> DbFactory
 @inject AuthService Auth
-
 @inject NavigationManager Nav
-@inject EmailService EmailService
+@inject RichiesteService Richieste
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @using GestioneFerie.Web.Data
@@ -44,11 +43,11 @@ else
           <tr>
             <td data-label="Dipendente">@r.Utente.Nome @r.Utente.Cognome</td>
             <td data-label="Tipo"><span
-              class="badge @(r.Tipo == TipoRichiesta.Ferie ? "badge-ferie" : "badge-permesso")">@r.Tipo</span></td>
+              class="badge @BadgeHelper.TipoBadgeClass(r.Tipo)">@r.Tipo</span></td>
               <td data-label="Dal">@r.DataInizio.ToString("dd/MM/yyyy")</td>
               <td data-label="Al">@r.DataFine.ToString("dd/MM/yyyy")</td>
               <td data-label="Ore">@r.OreRichieste</td>
-              <td data-label="Stato"><span class="badge @GetStatoBadge(r.Stato)">@r.Stato</span></td>
+              <td data-label="Stato"><span class="badge @BadgeHelper.StatoBadgeClass(r.Stato)">@r.Stato</span></td>
               <td data-label="Note">@(r.Note ?? "—")</td>
               <td data-label="Motivo rifiuto">@(r.MotivoRifiuto ?? "—")</td>
               <td data-label="Azioni">
@@ -108,33 +107,9 @@ else
         .ToListAsync();
   }
 
-  string GetStatoBadge(StatoRichiesta stato) => stato switch
-  {
-    StatoRichiesta.Approvata => "badge-success",
-    StatoRichiesta.Rifiutata => "badge-danger",
-    _ => "badge-warning"
-  };
-
   async Task Approva(int id)
   {
-    using var db = DbFactory.CreateDbContext();
-    var r = await db.RichiestaFerie.Include(r => r.Utente).FirstOrDefaultAsync(r => r.Id == id);
-    if (r == null) return;
-    r.Stato = StatoRichiesta.Approvata;
-    var saldo = await db.SaldoFerie.FirstOrDefaultAsync(s => s.UtenteId == r.UtenteId && s.Anno == DateTime.Now.Year);
-    if (saldo != null) saldo.OreUsate += r.OreRichieste;
-    await db.SaveChangesAsync();
-
-    await EmailService.InviaAsync(
-        r.Utente.Email,
-        "La tua richiesta ferie è stata approvata ✅",
-        $"""
-            <p>Ciao {r.Utente.Nome},</p>
-            <p>La tua richiesta di <strong>{r.Tipo}</strong> dal <strong>{r.DataInizio:dd/MM/yyyy}</strong> al <strong>{r.DataFine:dd/MM/yyyy}</strong> è stata <strong>approvata</strong>.</p>
-            <p>Ore scalate: <strong>{r.OreRichieste}</strong></p>
-            """
-    );
-
+    await Richieste.ApprovaAsync(id);
     await CaricaRichieste();
   }
 
@@ -147,23 +122,7 @@ else
 
   async Task ConfermaRifiuto()
   {
-    using var db = DbFactory.CreateDbContext();
-    var r = await db.RichiestaFerie.Include(r => r.Utente).FirstOrDefaultAsync(r => r.Id == richiestaRifiutoId);
-    if (r == null) return;
-    r.Stato = StatoRichiesta.Rifiutata;
-    r.MotivoRifiuto = motivoRifiuto;
-    await db.SaveChangesAsync();
-
-    await EmailService.InviaAsync(
-        r.Utente.Email,
-        "La tua richiesta ferie è stata rifiutata ❌",
-        $"""
-            <p>Ciao {r.Utente.Nome},</p>
-            <p>La tua richiesta di <strong>{r.Tipo}</strong> dal <strong>{r.DataInizio:dd/MM/yyyy}</strong> al <strong>{r.DataFine:dd/MM/yyyy}</strong> è stata <strong>rifiutata</strong>.</p>
-            <p>Motivo: <strong>{motivoRifiuto}</strong></p>
-            """
-    );
-
+    await Richieste.RifiutaAsync(richiestaRifiutoId, motivoRifiuto);
     mostraModalRifiuto = false;
     await CaricaRichieste();
   }

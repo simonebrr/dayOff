@@ -1,15 +1,17 @@
 .btn-danger {
   font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 0.5px solid #F09595;
-  background: #FCEBEB;
-  color: #A32D2D;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #F0BDBD;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
   cursor: pointer;
   margin-left: 6px;
+  font-weight: 500;
 }
 
 .btn-danger:hover {
-  background: #e53e3e;
+  background: var(--color-danger-strong);
   color: white;
+  border-color: var(--color-danger-strong);
 }

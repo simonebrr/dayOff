@@ -13,7 +13,7 @@
 <div class="page-header">
   <h2>Le mie richieste</h2>
   <p class="subtitle">Storico di tutte le tue richieste ferie e permessi</p>
-  <a href="/nuova-richiesta" class="btn-primary align=left">+ Nuova richiesta</a>
+  <a href="/nuova-richiesta" class="btn-primary">+ Nuova richiesta</a>
 </div>
 
 @if (!richieste.Any())
@@ -39,11 +39,11 @@ else
         @foreach (var r in richieste)
         {
           <tr>
-            <td><span class="badge @(r.Tipo == TipoRichiesta.Ferie ? "badge-ferie" : "badge-permesso")">@r.Tipo</span></td>
+            <td><span class="badge @BadgeHelper.TipoBadgeClass(r.Tipo)">@r.Tipo</span></td>
             <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
             <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
             <td>@r.OreRichieste</td>
-            <td><span class="badge @GetStatoBadge(r.Stato)">@r.Stato</span></td>
+            <td><span class="badge @BadgeHelper.StatoBadgeClass(r.Stato)">@r.Stato</span></td>
             <td>@(r.Note ?? "—")</td>
             <td>@(r.MotivoRifiuto ?? "—")</td>
           </tr>
@@ -73,11 +73,4 @@ else
       StateHasChanged();
     }
   }
-
-  string GetStatoBadge(StatoRichiesta stato) => stato switch
-  {
-    StatoRichiesta.Approvata => "badge-success",
-    StatoRichiesta.Rifiutata => "badge-danger",
-    _ => "badge-warning"
-  };
 }

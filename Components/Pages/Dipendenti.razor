@@ -1,12 +1,9 @@
 @page "/dipendenti"
-@inject IDbContextFactory<AppDbContext> DbFactory
 @inject AuthService Auth
 @inject NavigationManager Nav
-@inject EmailService EmailService
+@inject DipendentiService Dipendenti
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
-@using GestioneFerie.Web.Data
-@using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Components.Forms
 @rendermode InteractiveServer
 
@@ -194,9 +191,6 @@ else
   }
 
 @code {
-  record DipendenteViewModel(Utente Utente, SaldoFerie? Saldo);
-  record CsvRiga(string Nome, string Cognome, string Email, decimal OreFerie);
-
   List<DipendenteViewModel> dipendenti = new();
   bool mostraModalNuovo = false;
   bool mostraModalAssegnaTutti = false;
@@ -208,7 +202,6 @@ else
   string nuovoNome = "";
   string nuovoCognome = "";
   string nuovaEmail = "";
-  string nuovaPassword = "";
   decimal nuoveOre = 160;
   decimal oreAssegnaTutti = 160;
 
@@ -221,6 +214,9 @@ else
   string csvMessaggio = "";
   bool csvErrore = false;
   bool csvImportando = false;
+
+  int Anno => DateTime.Now.Year;
+  string ModificatoDa => Auth.UtenteNome ?? "Capo";
 
   protected override async Task OnAfterRenderAsync(bool firstRender)
   {
@@ -238,21 +234,7 @@ else
 
   async Task CaricaDipendenti()
   {
-    using var db = DbFactory.CreateDbContext();
-    var anno = DateTime.Now.Year;
-    var utenti = await db.Utenti
-        .Where(u => u.Ruolo == Ruolo.Dipendente && u.AziendaId == Auth.AziendaId)
-        .ToListAsync();
-
-    var utenteIds = utenti.Select(u => u.Id).ToList();
-    var saldi = await db.SaldoFerie
-        .Where(s => s.Anno == anno && utenteIds.Contains(s.UtenteId))
-        .ToListAsync();
-
-    dipendenti = utenti.Select(u => new DipendenteViewModel(
-        u,
-        saldi.FirstOrDefault(s => s.UtenteId == u.Id)
-    )).ToList();
+    dipendenti = await Dipendenti.ListaAsync(Auth.AziendaId, Anno);
   }
 
   void AttivaModificaMassiva()
@@ -290,57 +272,7 @@ else
 
   async Task SalvaTutti()
   {
-    using var db = DbFactory.CreateDbContext();
-    var anno = DateTime.Now.Year;
-    var utenteIds = modificheMassive.Keys.ToList();
-
-    var saldi = await db.SaldoFerie
-        .Where(s => s.Anno == anno && utenteIds.Contains(s.UtenteId))
-        .ToListAsync();
-
-    var utenti = await db.Utenti
-        .Where(u => utenteIds.Contains(u.Id))
-        .ToListAsync();
-
-    foreach (var (utenteId, oreTotali) in modificheMassive)
-    {
-      var saldo = saldi.FirstOrDefault(s => s.UtenteId == utenteId);
-      await SalvaLog(db, utenteId, saldo?.OreTotali ?? 0, oreTotali);
-
-      if (saldo == null)
-      {
-        db.SaldoFerie.Add(new SaldoFerie
-        {
-          UtenteId = utenteId,
-          OreTotali = oreTotali,
-          OreUsate = 0,
-          Anno = anno
-        });
-      }
-      else
-      {
-        saldo.OreTotali = oreTotali;
-      }
-    }
-
-    await db.SaveChangesAsync();
-
-    var snapshot = utenti
-        .Where(u => !string.IsNullOrWhiteSpace(u.Email))
-        .Select(u => (u.Email, u.Nome, Ore: modificheMassive[u.Id]))
-        .ToList();
-
-    var emailTasks = snapshot.Select(u => EmailService.InviaAsync(
-        u.Email,
-        $"Saldo ferie aggiornato - {anno}",
-        $"""
-        <p>Ciao {u.Nome},</p>
-        <p>Il tuo saldo ferie per l'anno <strong>{anno}</strong> è stato aggiornato:</p>
-        <p>Ore totali: <strong>{u.Ore}</strong></p>
-        <p>Il team HR</p>
-        """
-    ));
-    await Task.WhenAll(emailTasks);
+    await Dipendenti.SalvaTuttiAsync(modificheMassive, Anno, ModificatoDa);
 
     modificaMassiva = false;
     modificheMassive.Clear();
@@ -358,58 +290,9 @@ else
 
   void AnnullaModifica() => modificaSaldoId = 0;
 
-  async Task SalvaLog(AppDbContext db, int utenteId, decimal orePrecedenti, decimal oreNuove)
-  {
-    db.LogModificheSaldo.Add(new LogModificaSaldo
-    {
-      UtenteId = utenteId,
-      OrePrecedenti = orePrecedenti,
-      OreNuove = oreNuove,
-      DataModifica = DateTime.Now,
-      ModificatoDa = Auth.UtenteNome ?? "Capo",
-      Anno = DateTime.Now.Year
-    });
-  }
-
   async Task SalvaSaldo(int utenteId)
   {
-    using var db = DbFactory.CreateDbContext();
-    var anno = DateTime.Now.Year;
-    var saldo = await db.SaldoFerie.FirstOrDefaultAsync(s => s.UtenteId == utenteId && s.Anno == anno);
-    var utente = await db.Utenti.FindAsync(utenteId);
-
-    await SalvaLog(db, utenteId, saldo?.OreTotali ?? 0, oreTotaliModifica);
-
-    if (saldo == null)
-    {
-      db.SaldoFerie.Add(new SaldoFerie
-      {
-        UtenteId = utenteId,
-        OreTotali = oreTotaliModifica,
-        OreUsate = 0,
-        Anno = anno
-      });
-    }
-    else
-    {
-      saldo.OreTotali = oreTotaliModifica;
-    }
-
-    await db.SaveChangesAsync();
-
-    if (utente != null && !string.IsNullOrWhiteSpace(utente.Email))
-    {
-      await EmailService.InviaAsync(
-          utente.Email,
-          $"Saldo ferie aggiornato - {anno}",
-          $"""
-          <p>Ciao {utente.Nome},</p>
-          <p>Il tuo saldo ferie per l'anno <strong>{anno}</strong> è stato aggiornato:</p>
-          <p>Ore totali: <strong>{oreTotaliModifica}</strong></p>
-          <p>Il team HR</p>
-          """
-      );
-    }
+    await Dipendenti.SalvaSaldoAsync(utenteId, oreTotaliModifica, Anno, ModificatoDa);
 
     modificaSaldoId = 0;
     messaggio = "Saldo aggiornato! Email inviata al dipendente.";
@@ -419,54 +302,13 @@ else
 
   async Task AssegnaTutti()
   {
-    using var db = DbFactory.CreateDbContext();
-    var anno = DateTime.Now.Year;
-    var utenteIds = dipendenti.Select(d => d.Utente.Id).ToList();
-
-    var saldi = await db.SaldoFerie
-        .Where(s => s.Anno == anno && utenteIds.Contains(s.UtenteId))
-        .ToListAsync();
-
-    foreach (var d in dipendenti)
-    {
-      var saldo = saldi.FirstOrDefault(s => s.UtenteId == d.Utente.Id);
-      await SalvaLog(db, d.Utente.Id, saldo?.OreTotali ?? 0, oreAssegnaTutti);
-
-      if (saldo == null)
-        db.SaldoFerie.Add(new SaldoFerie { UtenteId = d.Utente.Id, OreTotali = oreAssegnaTutti, OreUsate = 0, Anno = anno });
-      else
-        saldo.OreTotali = oreAssegnaTutti;
-    }
-
-    await db.SaveChangesAsync();
-
-    // snapshot PRIMA di resettare e ricaricare
-    var oreSnapshot = oreAssegnaTutti;
-    var dipendentiSnapshot = dipendenti
-        .Where(d => !string.IsNullOrWhiteSpace(d.Utente.Email))
-        .Select(d => (d.Utente.Email, d.Utente.Nome))
-        .ToList();
+    await Dipendenti.AssegnaTuttiAsync(Auth.AziendaId, oreAssegnaTutti, Anno, ModificatoDa);
 
     mostraModalAssegnaTutti = false;
-    messaggio = $"Assegnate {oreSnapshot} ore a tutti i dipendenti!";
+    messaggio = $"Assegnate {oreAssegnaTutti} ore a tutti i dipendenti!";
     errore = false;
     await CaricaDipendenti();
     await InvokeAsync(StateHasChanged);
-
-    _ = Task.Run(async () =>
-    {
-      var tasks = dipendentiSnapshot.Select(d => EmailService.InviaAsync(
-          d.Email,
-          $"Saldo ferie aggiornato - {anno}",
-          $"""
-          <p>Ciao {d.Nome},</p>
-          <p>Il tuo saldo ferie per l'anno <strong>{anno}</strong>
-             è stato aggiornato a <strong>{oreSnapshot} ore</strong>.</p>
-          <p>Il team HR</p>
-          """
-      ));
-      await Task.WhenAll(tasks);
-    });
   }
 
   async Task AggiungiDipendente()
@@ -478,60 +320,14 @@ else
       return;
     }
 
-    using var db = DbFactory.CreateDbContext();
+    var (success, msg) = await Dipendenti.AggiungiAsync(Auth.AziendaId, nuovoNome, nuovoCognome, nuovaEmail, nuoveOre, Anno);
+    messaggio = msg;
+    errore = !success;
+    if (!success) return;
 
-    if (await db.Utenti.AnyAsync(u => u.Email == nuovaEmail))
-    {
-      messaggio = "Email già in uso.";
-      errore = true;
-      return;
-    }
-
-    var passwordRandom = GeneraPassword();
-
-    var utente = new Utente
-    {
-      Nome = nuovoNome,
-      Cognome = nuovoCognome,
-      Email = nuovaEmail,
-      PasswordHash = BCrypt.Net.BCrypt.HashPassword(passwordRandom),
-      Ruolo = Ruolo.Dipendente,
-      AziendaId = Auth.AziendaId
-    };
-    db.Utenti.Add(utente);
-    await db.SaveChangesAsync();
-
-    db.SaldoFerie.Add(new SaldoFerie
-    {
-      UtenteId = utente.Id,
-      OreTotali = nuoveOre,
-      OreUsate = 0,
-      Anno = DateTime.Now.Year
-    });
-    await db.SaveChangesAsync();
-
-    // snapshot PRIMA di resettare i campi
-    var emailSnapshot = nuovaEmail;
-    var nomeSnapshot = nuovoNome;
-
-    messaggio = $"Dipendente {nuovoNome} {nuovoCognome} aggiunto! Email con credenziali inviata.";
-    errore = false;
     mostraModalNuovo = false;
-    nuovoNome = nuovoCognome = nuovaEmail = nuovaPassword = "";
+    nuovoNome = nuovoCognome = nuovaEmail = "";
     nuoveOre = 160;
-
-    _ = Task.Run(() => EmailService.InviaAsync(
-        emailSnapshot,
-        "Benvenuto! Le tue credenziali di accesso",
-        $"""
-        <p>Ciao {nomeSnapshot},</p>
-        <p>Il tuo account è stato creato. Ecco le tue credenziali:</p>
-        <p>Email: <strong>{emailSnapshot}</strong></p>
-        <p>Password: <strong>{passwordRandom}</strong></p>
-        <p>Ti consigliamo di cambiare la password al primo accesso.</p>
-        <p>Il team HR</p>
-        """
-    ));
 
     await CaricaDipendenti();
   }
@@ -549,38 +345,7 @@ else
     using var reader = new System.IO.StreamReader(stream);
     var content = await reader.ReadToEndAsync();
 
-    var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-    var nuoveRighe = new List<CsvRiga>();
-
-    foreach (var line in lines)
-    {
-      var trimmed = line.Trim();
-      if (string.IsNullOrEmpty(trimmed)) continue;
-
-      var parts = trimmed.Split(',');
-      if (parts.Length < 3) continue;
-
-      var nome = parts[0].Trim();
-      var cognome = parts[1].Trim();
-      var email = parts[2].Trim();
-
-      // Skip header row
-      if (nome.Equals("Nome", StringComparison.OrdinalIgnoreCase)) continue;
-
-      if (string.IsNullOrWhiteSpace(nome) || string.IsNullOrWhiteSpace(email)) continue;
-
-      decimal oreFerie = 160;
-      if (parts.Length >= 4 && decimal.TryParse(
-              parts[3].Trim(),
-              System.Globalization.NumberStyles.Number,
-              System.Globalization.CultureInfo.InvariantCulture,
-              out var oreFromCsv))
-        oreFerie = oreFromCsv;
-
-      nuoveRighe.Add(new CsvRiga(nome, cognome, email, oreFerie));
-    }
-
-    csvRighe = nuoveRighe;
+    csvRighe = DipendentiService.ParseCsv(content);
     if (!csvRighe.Any())
     {
       csvMessaggio = "Nessuna riga valida trovata nel file CSV.";
@@ -594,71 +359,12 @@ else
 
     csvImportando = true;
     csvMessaggio = "";
-    int importati = 0;
-    int saltati = 0;
 
-    using var db = DbFactory.CreateDbContext();
-    var anno = DateTime.Now.Year;
-
-    var emailsSnapshot = new List<(string Email, string Nome, string Password)>();
-
-    foreach (var riga in csvRighe)
-    {
-      if (await db.Utenti.AnyAsync(u => u.Email == riga.Email))
-      {
-        saltati++;
-        continue;
-      }
-
-      var password = GeneraPassword();
-      var utente = new Utente
-      {
-        Nome = riga.Nome,
-        Cognome = riga.Cognome,
-        Email = riga.Email,
-        PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-        Ruolo = Ruolo.Dipendente,
-        AziendaId = Auth.AziendaId
-      };
-      db.Utenti.Add(utente);
-      await db.SaveChangesAsync();
-
-      db.SaldoFerie.Add(new SaldoFerie
-      {
-        UtenteId = utente.Id,
-        OreTotali = riga.OreFerie,
-        OreUsate = 0,
-        Anno = anno
-      });
-      await db.SaveChangesAsync();
-
-      emailsSnapshot.Add((riga.Email, riga.Nome, password));
-      importati++;
-    }
+    var (importati, saltati) = await Dipendenti.ImportaCsvAsync(Auth.AziendaId, csvRighe, Anno);
 
     csvImportando = false;
-    csvMessaggio = $"Importati {importati} dipendenti" + (saltati > 0 ? $", {saltati} saltati (email già esistente)." :
-".");
+    csvMessaggio = $"Importati {importati} dipendenti" + (saltati > 0 ? $", {saltati} saltati (email già esistente)." : ".");
     csvErrore = false;
-
-    _ = Task.Run(async () =>
-    {
-      foreach (var (email, nome, pwd) in emailsSnapshot)
-      {
-        await EmailService.InviaAsync(
-            email,
-            "Benvenuto! Le tue credenziali di accesso",
-            $"""
-            <p>Ciao {nome},</p>
-            <p>Il tuo account è stato creato. Ecco le tue credenziali:</p>
-            <p>Email: <strong>{email}</strong></p>
-            <p>Password: <strong>{pwd}</strong></p>
-            <p>Ti consigliamo di cambiare la password al primo accesso.</p>
-            <p>Il team HR</p>
-            """
-        );
-      }
-    });
 
     messaggio = csvMessaggio;
     errore = false;
@@ -674,12 +380,5 @@ else
     csvRighe.Clear();
     csvMessaggio = "";
     csvErrore = false;
-  }
-
-  string GeneraPassword()
-  {
-    const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
-    var random = new Random();
-    return new string(Enumerable.Range(0, 12).Select(_ => chars[random.Next(chars.Length)]).ToArray());
   }
 }

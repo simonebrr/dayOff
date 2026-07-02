@@ -2,7 +2,7 @@
 @inject IDbContextFactory<AppDbContext> DbFactory
 @inject AuthService Auth
 @inject NavigationManager Nav
-@inject EmailService EmailService
+@inject DipendentiService Dipendenti
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @using GestioneFerie.Web.Data
@@ -78,11 +78,11 @@ else
           @foreach (var r in richieste)
           {
             <tr>
-              <td><span class="badge @(r.Tipo == TipoRichiesta.Ferie ? "badge-ferie" : "badge-permesso")">@r.Tipo</span></td>
+              <td><span class="badge @BadgeHelper.TipoBadgeClass(r.Tipo)">@r.Tipo</span></td>
               <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
               <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
               <td>@r.OreRichieste</td>
-              <td><span class="badge @GetStatoBadge(r.Stato)">@r.Stato</span></td>
+              <td><span class="badge @BadgeHelper.StatoBadgeClass(r.Stato)">@r.Stato</span></td>
               <td>@(r.Note ?? "—")</td>
               <td>@(r.MotivoRifiuto ?? "—")</td>
             </tr>
@@ -214,37 +214,7 @@ else
 
   async Task Ripristina(LogModificaSaldo log)
   {
-    using var db = DbFactory.CreateDbContext();
-    var anno = DateTime.Now.Year;
-    var saldoDb = await db.SaldoFerie.FirstOrDefaultAsync(s => s.UtenteId == Id && s.Anno == anno);
-
-    if (saldoDb == null) return;
-
-    db.LogModificheSaldo.Add(new LogModificaSaldo
-    {
-      UtenteId = Id,
-      OrePrecedenti = saldoDb.OreTotali,
-      OreNuove = log.OrePrecedenti,
-      DataModifica = DateTime.Now,
-      ModificatoDa = Auth.UtenteNome ?? "Capo",
-      Anno = anno
-    });
-
-    saldoDb.OreTotali = log.OrePrecedenti;
-    await db.SaveChangesAsync();
-
-    if (utente != null)
-    {
-      await EmailService.InviaAsync(
-          utente.Email,
-          $"Saldo ferie ripristinato - {anno}",
-          $"""
-                <p>Ciao {utente.Nome},</p>
-                <p>Il tuo saldo ferie per l'anno <strong>{anno}</strong> è stato ripristinato a <strong>{log.OrePrecedenti} ore</strong>.</p>
-                <p>Il team HR</p>
-                """
-      );
-    }
+    await Dipendenti.RipristinaSaldoAsync(Id, log, Auth.UtenteNome ?? "Capo");
 
     messaggio = $"Saldo ripristinato a {log.OrePrecedenti} ore!";
     errore = false;
@@ -253,30 +223,7 @@ else
 
   async Task EliminaDipendente()
   {
-    using var db = DbFactory.CreateDbContext();
-
-    var richiesteDip = await db.RichiestaFerie.Where(r => r.UtenteId == Id).ToListAsync();
-    db.RichiestaFerie.RemoveRange(richiesteDip);
-
-    var saldiDip = await db.SaldoFerie.Where(s => s.UtenteId == Id).ToListAsync();
-    db.SaldoFerie.RemoveRange(saldiDip);
-
-    var logDip = await db.LogModificheSaldo.Where(l => l.UtenteId == Id).ToListAsync();
-    db.LogModificheSaldo.RemoveRange(logDip);
-
-    var utenteDip = await db.Utenti.FindAsync(Id);
-    if (utenteDip != null) db.Utenti.Remove(utenteDip);
-
-    await db.SaveChangesAsync();
+    await Dipendenti.EliminaDipendenteAsync(Id);
     Nav.NavigateTo("/dipendenti");
   }
-
-  string GetStatoBadge(StatoRichiesta stato) => stato switch
-  {
-    StatoRichiesta.Approvata => "badge-success",
-    StatoRichiesta.Rifiutata => "badge-danger",
-    _ => "badge-warning"
-  };
-
-  record SaldoItem(string Label = "", double Valore = 0);
 }

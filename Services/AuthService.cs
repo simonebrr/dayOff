@@ -33,14 +33,4 @@ public class AuthService
   {
     return _session.LoadAsync();
   }
-
-  public void Logout()
-  {
-    _ = _session.ClearAsync();
-  }
-
-  public async Task LogoutAsync()
-  {
-    await _session.ClearAsync();
-  }
 }

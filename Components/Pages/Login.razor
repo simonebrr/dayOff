@@ -12,13 +12,17 @@
       <p>Accedi al tuo account</p>
     </div>
 
-    @if (Nav.Uri.Contains("error=1"))
+    @if (Nav.Uri.Contains("error=blocked"))
+    {
+      <div class="alert-error">Troppi tentativi falliti. Riprova tra qualche minuto.</div>
+    }
+    else if (Nav.Uri.Contains("error=1"))
     {
       <div class="alert-error">Email o password non corretti.</div>
     }
 
     <form method="post" action="/auth/login">
-      <input name="__RequestVerificationToken" type="hidden" value="@antiforgery" />
+      <AntiforgeryToken />
       <div class="form-group">
         <label>Email</label>
         <input type="email" name="email" placeholder="tuaemail@azienda.it" required />
@@ -33,8 +37,6 @@
 </div>
 
 @code {
-  string antiforgery = "";
-
   protected override void OnInitialized()
   {
     if (Auth.IsAuthenticated)

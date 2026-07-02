@@ -22,6 +22,10 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddHttpClient();
 builder.Services.AddApexCharts();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<LoginAttemptService>();
+builder.Services.AddScoped<RichiesteService>();
+builder.Services.AddScoped<DipendentiService>();
+builder.Services.AddScoped<AziendeService>();
 
 builder.Services.AddServerSideBlazor(options =>
 {
@@ -52,16 +56,26 @@ app.UseAntiforgery();
 app.MapGet("/", () => Results.Redirect("/login"));
 
 app.MapPost("/auth/login", async (HttpContext ctx,
-    IDbContextFactory<AppDbContext> dbFactory) =>
+    IDbContextFactory<AppDbContext> dbFactory,
+    LoginAttemptService loginAttempts) =>
 {
   var form = await ctx.Request.ReadFormAsync();
   var email = form["email"].ToString();
   var password = form["password"].ToString();
+  var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "sconosciuto";
+
+  if (await loginAttempts.IsBloccatoAsync(email, ip))
+    return Results.Redirect("/login?error=blocked");
 
   using var db = dbFactory.CreateDbContext();
   var utente = await db.Utenti.FirstOrDefaultAsync(u => u.Email == email);
   if (utente == null || !BCrypt.Net.BCrypt.Verify(password, utente.PasswordHash))
+  {
+    await loginAttempts.RegistraAsync(email, ip, successo: false);
     return Results.Redirect("/login?error=1");
+  }
+
+  await loginAttempts.RegistraAsync(email, ip, successo: true);
 
   var cookieOptions = new CookieOptions
   {
@@ -78,7 +92,7 @@ app.MapPost("/auth/login", async (HttpContext ctx,
 
   var redirect = utente.Ruolo.ToString() == "SuperAdmin" ? "/admin" : "/dashboard";
   return Results.Redirect(redirect);
-}).DisableAntiforgery();
+});
 
 app.MapGet("/auth/logout", (HttpContext ctx) =>
 {

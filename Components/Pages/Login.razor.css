@@ -4,15 +4,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f5f5;
+  background: linear-gradient(160deg, #F5F6F8 0%, var(--color-primary-light) 130%);
   padding: 1rem;
 }
 
 .login-card {
-  background: white;
+  background: var(--color-surface);
   padding: 2.5rem;
-  border-radius: 12px;
-  border: 0.5px solid #e0e0e0;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 400px;
 }
@@ -23,13 +24,14 @@
 }
 
 .login-header h1 {
-  font-size: 22px;
-  font-weight: 500;
+  font-size: 1.4rem;
+  font-weight: 600;
   margin-bottom: 6px;
+  letter-spacing: -0.01em;
 }
 
 .login-header p {
-  color: #888;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
@@ -40,49 +42,55 @@
 .form-group label {
   display: block;
   font-size: 13px;
-  color: #555;
+  color: var(--color-text-muted);
   margin-bottom: 6px;
+  font-weight: 500;
 }
 
 .form-group input {
   width: 100%;
   padding: 10px 12px;
-  border: 0.5px solid #ddd;
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   font-size: 14px;
   outline: none;
+  font-family: inherit;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .form-group input:focus {
-  border-color: #1D9E75;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.12);
 }
 
 .btn-login {
   width: 100%;
   padding: 12px;
-  background: #1D9E75;
+  background: var(--color-primary);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
   margin-top: 0.5rem;
+  transition: background var(--transition-fast);
 }
 
 .btn-login:hover {
-  background: #0F6E56;
+  background: var(--color-primary-dark);
 }
 
 .btn-login:disabled {
-  background: #aaa;
+  background: var(--color-text-faint);
   cursor: not-allowed;
 }
 
 .alert-error {
-  background: #FCEBEB;
-  color: #A32D2D;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   margin-bottom: 1rem;
 }

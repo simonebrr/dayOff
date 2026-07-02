@@ -1,12 +1,9 @@
 @page "/nuova-richiesta"
 @inject AuthService Auth
 @inject NavigationManager Nav
-@inject IDbContextFactory<AppDbContext> DbFactory
-@inject EmailService EmailService
+@inject RichiesteService Richieste
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
-@using GestioneFerie.Web.Data
-@using Microsoft.EntityFrameworkCore
 @rendermode InteractiveServer
 
 <PageTitle>Nuova Richiesta</PageTitle>
@@ -179,8 +176,6 @@
   bool richiedeAutorizzazione = false;
   string nomeCapo = "";
   SaldoFerie? saldo;
-  HashSet<DateTime> festiviCache = new();
-  int anniCacheati = 0;
 
   protected override async Task OnAfterRenderAsync(bool firstRender)
   {
@@ -191,96 +186,29 @@
         Nav.NavigateTo("/login");
         return;
       }
-      using var db = DbFactory.CreateDbContext();
-      saldo = await db.SaldoFerie.FirstOrDefaultAsync(s =>
-          s.UtenteId == Auth.UtenteId && s.Anno == DateTime.Now.Year);
 
-      var capo = await db.Utenti
-          .FirstOrDefaultAsync(u => u.Ruolo == Ruolo.Capo && u.AziendaId == Auth.AziendaId);
-      nomeCapo = capo != null ? $"{capo.Nome} {capo.Cognome}" : "il tuo responsabile";
+      saldo = await Richieste.GetSaldoAsync(Auth.UtenteId!.Value, DateTime.Now.Year);
+      nomeCapo = await Richieste.GetNomeCapoAsync(Auth.AziendaId);
 
       await CalcolaOre();
       StateHasChanged();
     }
   }
 
-  HashSet<DateTime> GetFestivi(int anno)
+  Task CalcolaOre()
   {
-    if (anniCacheati == anno && festiviCache.Count > 0)
-      return new HashSet<DateTime>(festiviCache);
-
-    festiviCache = GetFestiviFissi(anno);
-    anniCacheati = anno;
-    return new HashSet<DateTime>(festiviCache);
-  }
-
-  HashSet<DateTime> GetFestiviFissi(int anno)
-  {
-    var festivi = new HashSet<DateTime>
+    if (tipo == "Ferie")
     {
-      new DateTime(anno, 1, 1),
-      new DateTime(anno, 1, 6),
-      new DateTime(anno, 4, 25),
-      new DateTime(anno, 5, 1),
-      new DateTime(anno, 6, 2),
-      new DateTime(anno, 8, 15),
-      new DateTime(anno, 11, 1),
-      new DateTime(anno, 12, 8),
-      new DateTime(anno, 12, 25),
-      new DateTime(anno, 12, 26),
-    };
-    var pasqua = CalcolaPasqua(anno);
-    festivi.Add(pasqua);
-    festivi.Add(pasqua.AddDays(1));
-    return festivi;
-  }
-
-  DateTime CalcolaPasqua(int anno)
-  {
-    int a = anno % 19, b = anno / 100, c = anno % 100;
-    int d = b / 4, e = b % 4, f = (b + 8) / 25;
-    int g = (b - f + 1) / 3;
-    int h = (19 * a + b - d - g + 15) % 30;
-    int i = c / 4, k = c % 4;
-    int l = (32 + 2 * e + 2 * i - h - k) % 7;
-    int m = (a + 11 * h + 22 * l) / 451;
-    int mese = (h + l - 7 * m + 114) / 31;
-    int giorno = ((h + l - 7 * m + 114) % 31) + 1;
-    return new DateTime(anno, mese, giorno);
-  }
-
-  async Task CalcolaOre()
-  {
-    if (tipo != "Ferie")
+      giorniLavorativi = HolidayCalculator.GiorniLavorativi(dataInizio, dataFine);
+      ore = giorniLavorativi * 8;
+    }
+    else
     {
       giorniLavorativi = 0;
       if (tipo == "Malattia") ore = 0;
-      StateHasChanged();
-      return;
     }
-    if (dataFine.Date < dataInizio.Date)
-    {
-      giorniLavorativi = 0;
-      ore = 0;
-      StateHasChanged();
-      return;
-    }
-
-    var festivi = GetFestivi(dataInizio.Year);
-    if (dataFine.Year != dataInizio.Year)
-      festivi.UnionWith(GetFestivi(dataFine.Year));
-
-    int giorni = 0;
-    for (var d = dataInizio.Date; d <= dataFine.Date; d = d.AddDays(1))
-    {
-      bool isWeekend = d.DayOfWeek == DayOfWeek.Saturday || d.DayOfWeek == DayOfWeek.Sunday;
-      bool isFestivo = festivi.Contains(d.Date);
-      if (!isWeekend && !isFestivo) giorni++;
-    }
-
-    giorniLavorativi = giorni;
-    ore = giorni * 8;
     StateHasChanged();
+    return Task.CompletedTask;
   }
 
   async Task InviaRichiesta()
@@ -298,8 +226,8 @@
       return;
     }
 
-    // Controllo preavviso 4 giorni (solo per Ferie e Permesso)
-    if (tipo != "Malattia" && (dataInizio.Date - DateTime.Today.Date).TotalDays < 4)
+    // Controllo preavviso minimo (solo per Ferie e Permesso)
+    if (tipo != "Malattia" && RichiesteService.PreavvisoInsufficiente(dataInizio))
     {
       richiedeAutorizzazione = true;
       messaggio = "";
@@ -337,75 +265,17 @@
     caricamento = true;
     StateHasChanged();
 
-    using var db = DbFactory.CreateDbContext();
-    db.RichiestaFerie.Add(new RichiestaFerie
-    {
-      UtenteId = Auth.UtenteId!.Value,
-      Tipo = Enum.Parse<TipoRichiesta>(tipo),
-      DataInizio = dataInizio,
-      DataFine = dataFine,
-      OreRichieste = ore,
-      Note = string.IsNullOrWhiteSpace(note) ? null : note,
-      CodiceMalattia = tipo == "Malattia" ? codiceMalattia : null,
-      Stato = StatoRichiesta.InAttesa,
-      DataRichiesta = DateTime.Now
-    });
-    await db.SaveChangesAsync();
-
     if (tipo == "Malattia")
     {
-      using var dbMalattia = DbFactory.CreateDbContext();
-      var utente = await dbMalattia.Utenti
-          .Include(u => u.Azienda)
-          .ThenInclude(a => a!.Capo)
-          .FirstOrDefaultAsync(u => u.Id == Auth.UtenteId);
-      var emailDestinatario = utente?.Azienda?.EmailMalattia
-          ?? utente?.Azienda?.Capo?.Email
-          ?? "";
-      if (!string.IsNullOrEmpty(emailDestinatario))
-      {
-        await EmailService.InviaAsync(
-            emailDestinatario,
-            $"🤒 Segnalazione malattia - {Auth.UtenteNome}",
-            $"""
-          <p>Il dipendente <strong>{Auth.UtenteNome}</strong> ha segnalato una malattia.</p>
-          <p>Codice malattia: <strong>{codiceMalattia}</strong></p>
-          <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
-          <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
-          <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
-          """
-        );
-      }
+      await Richieste.InviaMalattiaAsync(
+          Auth.UtenteId!.Value, Auth.UtenteNome ?? "", dataInizio, dataFine, codiceMalattia, note);
       messaggio = "Malattia segnalata! Il codice è stato inviato all'ufficio HR.";
     }
     else
     {
-      using var dbCapo = DbFactory.CreateDbContext();
-      var capo = await dbCapo.Utenti
-          .FirstOrDefaultAsync(u => u.Ruolo == Ruolo.Capo && u.AziendaId == Auth.AziendaId);
-
-      if (capo != null)
-      {
-        var giorniPreavviso = (dataInizio.Date - DateTime.Today.Date).TotalDays;
-        var avvisoPreavviso = giorniPreavviso < 4
-            ? "<p>⚠️ Richiesta con meno di 4 giorni di preavviso.</p>"
-            : "";
-
-        await EmailService.InviaAsync(
-            capo.Email,
-            $"📋 Nuova richiesta di {tipo} - {Auth.UtenteNome}",
-            $"""
-          <p>Il dipendente <strong>{Auth.UtenteNome}</strong> ha inviato una nuova richiesta.</p>
-          <p>Tipo: <strong>{tipo}</strong></p>
-          <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
-          <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
-          <p>Ore: <strong>{ore}</strong></p>
-          <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
-          {avvisoPreavviso}
-          <p>Accedi al pannello per approvare o rifiutare.</p>
-          """
-        );
-      }
+      await Richieste.InviaFeriePermessoAsync(
+          Auth.UtenteId!.Value, Auth.UtenteNome ?? "", Auth.AziendaId,
+          Enum.Parse<TipoRichiesta>(tipo), dataInizio, dataFine, ore, note);
       messaggio = "Richiesta inviata con successo! Il capo la esaminerà a breve.";
     }
 
