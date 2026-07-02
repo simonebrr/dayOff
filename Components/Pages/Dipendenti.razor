@@ -1,7 +1,7 @@
 @page "/dipendenti"
 @inject AuthService Auth
 @inject NavigationManager Nav
-@inject DipendentiService Dipendenti
+@inject DipendentiService DipendentiSvc
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @using Microsoft.AspNetCore.Components.Forms
@@ -234,7 +234,7 @@ else
 
   async Task CaricaDipendenti()
   {
-    dipendenti = await Dipendenti.ListaAsync(Auth.AziendaId, Anno);
+    dipendenti = await DipendentiSvc.ListaAsync(Auth.AziendaId, Anno);
   }
 
   void AttivaModificaMassiva()
@@ -272,7 +272,7 @@ else
 
   async Task SalvaTutti()
   {
-    await Dipendenti.SalvaTuttiAsync(modificheMassive, Anno, ModificatoDa);
+    await DipendentiSvc.SalvaTuttiAsync(modificheMassive, Anno, ModificatoDa);
 
     modificaMassiva = false;
     modificheMassive.Clear();
@@ -292,7 +292,7 @@ else
 
   async Task SalvaSaldo(int utenteId)
   {
-    await Dipendenti.SalvaSaldoAsync(utenteId, oreTotaliModifica, Anno, ModificatoDa);
+    await DipendentiSvc.SalvaSaldoAsync(utenteId, oreTotaliModifica, Anno, ModificatoDa);
 
     modificaSaldoId = 0;
     messaggio = "Saldo aggiornato! Email inviata al dipendente.";
@@ -302,7 +302,7 @@ else
 
   async Task AssegnaTutti()
   {
-    await Dipendenti.AssegnaTuttiAsync(Auth.AziendaId, oreAssegnaTutti, Anno, ModificatoDa);
+    await DipendentiSvc.AssegnaTuttiAsync(Auth.AziendaId, oreAssegnaTutti, Anno, ModificatoDa);
 
     mostraModalAssegnaTutti = false;
     messaggio = $"Assegnate {oreAssegnaTutti} ore a tutti i dipendenti!";
@@ -320,7 +320,7 @@ else
       return;
     }
 
-    var (success, msg) = await Dipendenti.AggiungiAsync(Auth.AziendaId, nuovoNome, nuovoCognome, nuovaEmail, nuoveOre, Anno);
+    var (success, msg) = await DipendentiSvc.AggiungiAsync(Auth.AziendaId, nuovoNome, nuovoCognome, nuovaEmail, nuoveOre, Anno);
     messaggio = msg;
     errore = !success;
     if (!success) return;
@@ -360,7 +360,7 @@ else
     csvImportando = true;
     csvMessaggio = "";
 
-    var (importati, saltati) = await Dipendenti.ImportaCsvAsync(Auth.AziendaId, csvRighe, Anno);
+    var (importati, saltati) = await DipendentiSvc.ImportaCsvAsync(Auth.AziendaId, csvRighe, Anno);
 
     csvImportando = false;
     csvMessaggio = $"Importati {importati} dipendenti" + (saltati > 0 ? $", {saltati} saltati (email già esistente)." : ".");

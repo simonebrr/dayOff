@@ -2,7 +2,7 @@
 @inject IDbContextFactory<AppDbContext> DbFactory
 @inject AuthService Auth
 @inject NavigationManager Nav
-@inject RichiesteService Richieste
+@inject RichiesteService RichiesteSvc
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @using GestioneFerie.Web.Data
@@ -109,7 +109,7 @@ else
 
   async Task Approva(int id)
   {
-    await Richieste.ApprovaAsync(id);
+    await RichiesteSvc.ApprovaAsync(id);
     await CaricaRichieste();
   }
 
@@ -122,7 +122,7 @@ else
 
   async Task ConfermaRifiuto()
   {
-    await Richieste.RifiutaAsync(richiestaRifiutoId, motivoRifiuto);
+    await RichiesteSvc.RifiutaAsync(richiestaRifiutoId, motivoRifiuto);
     mostraModalRifiuto = false;
     await CaricaRichieste();
   }
