@@ -21,12 +21,12 @@
   <div class="filtro-group">
     <label>Dal</label>
     <input type="date" value="@dalData.ToString("yyyy-MM-dd")"
-           @onchange="e => { dalData = DateTime.Parse(e.Value!.ToString()!); Filtra(); }" />
+           @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) { dalData = d; Filtra(); } }" />
   </div>
   <div class="filtro-group">
     <label>Al</label>
     <input type="date" value="@alData.ToString("yyyy-MM-dd")"
-           @onchange="e => { alData = DateTime.Parse(e.Value!.ToString()!); Filtra(); }" />
+           @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) { alData = d; Filtra(); } }" />
   </div>
   <div class="filtro-group">
     <label>Tipo</label>

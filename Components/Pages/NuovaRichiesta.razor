@@ -69,8 +69,11 @@
       <label>Data inizio</label>
       <input type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@dataInizio.ToString("yyyy-MM-dd")"
              @onchange="async e => {
-               dataInizio = DateTime.SpecifyKind(DateTime.Parse(e.Value!.ToString()!), DateTimeKind.Local);
-               await CalcolaOre();
+               if (DateTime.TryParse(e.Value?.ToString(), out var d))
+               {
+                 dataInizio = DateTime.SpecifyKind(d, DateTimeKind.Local);
+                 await CalcolaOre();
+               }
              }
       " />
     </div>
@@ -78,8 +81,11 @@
       <label>Data fine</label>
       <input type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@dataFine.ToString("yyyy-MM-dd")"
              @onchange="async e => {
-               dataFine = DateTime.SpecifyKind(DateTime.Parse(e.Value!.ToString()!), DateTimeKind.Local);
-               await CalcolaOre();
+               if (DateTime.TryParse(e.Value?.ToString(), out var d))
+               {
+                 dataFine = DateTime.SpecifyKind(d, DateTimeKind.Local);
+                 await CalcolaOre();
+               }
              }
       " />
     </div>
