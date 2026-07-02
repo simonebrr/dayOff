@@ -4,17 +4,28 @@ using GestioneFerie.Web.Services;
 using Microsoft.EntityFrameworkCore;
 using ApexCharts;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
+// --- MODIFICA 1: path DB configurabile via variabile d'ambiente ---
+// In locale usa "gestioneferie.db" (default), su Fly imposta DB_PATH=/data/gestioneferie.db
+var dbPath = Environment.GetEnvironmentVariable("DB_PATH") ?? "gestioneferie.db";
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
-    options.UseSqlite("Data Source=gestioneferie.db"));
+    options.UseSqlite($"Data Source={dbPath}"));
+
+// --- MODIFICA 2: Data Protection Keys persistite su volume ---
+// In locale usa la cartella "keys" già esistente nel progetto, su Fly usa /data/keys
+var keysPath = Environment.GetEnvironmentVariable("KEYS_PATH") ?? "keys";
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysPath));
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<SessionService>();
@@ -69,6 +80,7 @@ app.MapPost("/auth/login", async (HttpContext ctx,
 
   using var db = dbFactory.CreateDbContext();
   var utente = await db.Utenti.FirstOrDefaultAsync(u => u.Email == email);
+
   if (utente == null || !BCrypt.Net.BCrypt.Verify(password, utente.PasswordHash))
   {
     await loginAttempts.RegistraAsync(email, ip, successo: false);
