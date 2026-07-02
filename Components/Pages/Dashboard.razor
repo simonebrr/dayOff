@@ -117,6 +117,10 @@
                            XValue="x => x.Nome" YValue="x => (decimal)x.OreDisponibili" />
         </ApexChart>
       }
+      else if (!graficiVisibili)
+      {
+        <div class="chart-skeleton"></div>
+      }
     </div>
     <div class="chart-card">
       <div class="chart-title">Richieste per mese</div>
@@ -126,6 +130,10 @@
           <ApexPointSeries TItem="RichiestaMese" Items="richiestePerMese" Name="Richieste" SeriesType="SeriesType.Line"
                            XValue="x => x.Mese" YValue="x => x.Conteggio" />
         </ApexChart>
+      }
+      else if (!graficiVisibili)
+      {
+        <div class="chart-skeleton"></div>
       }
     </div>
   </div>
@@ -179,6 +187,10 @@ else
           <ApexPointSeries TItem="SaldoItem" Items="saldoItems" Name="Ore" SeriesType="SeriesType.Donut" XValue="x => x.Label"
                            YValue="x => (decimal)x.Valore" />
         </ApexChart>
+      }
+      else
+      {
+        <div class="chart-skeleton"></div>
       }
     </div>
   }

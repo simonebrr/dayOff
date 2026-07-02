@@ -338,7 +338,7 @@ a {
 
 .btn-primary {
   padding: 9px 18px;
-  background: var(--color-primary);
+  background: linear-gradient(180deg, #22AC81 0%, var(--color-primary) 100%);
   color: white;
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-sm);
@@ -350,15 +350,18 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  box-shadow: 0 1px 2px rgba(21, 122, 91, 0.15);
 }
 
 .btn-primary:hover {
-  background: var(--color-primary-dark);
+  background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
   border-color: var(--color-primary-dark);
+  box-shadow: 0 2px 6px rgba(21, 122, 91, 0.25);
 }
 
 .btn-primary:active {
   transform: translateY(1px);
+  box-shadow: none;
 }
 
 .btn-primary:disabled {
@@ -489,6 +492,11 @@ a {
   border-radius: var(--radius-md);
   padding: 1.5rem;
   box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--transition-fast);
+}
+
+.form-card:hover {
+  box-shadow: var(--shadow-sm);
 }
 
 .form-group {
@@ -609,6 +617,12 @@ a {
   border-radius: var(--radius-md);
   padding: 1.25rem;
   box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--transition-fast);
+  min-height: 340px;
+}
+
+.chart-card:hover {
+  box-shadow: var(--shadow-sm);
 }
 
 .chart-title {
@@ -616,6 +630,22 @@ a {
   font-weight: 600;
   color: var(--color-text-muted);
   margin-bottom: 1rem;
+}
+
+/* Riserva lo spazio del grafico mentre i dati vengono ricaricati,
+   così il layout non "salta" quando il grafico viene smontato/rimontato. */
+.chart-skeleton {
+  width: 100%;
+  height: 260px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(100deg, #F1F2F4 30%, #F8F9FA 45%, #F1F2F4 60%);
+  background-size: 250% 100%;
+  animation: skeleton-pulse 1.4s ease infinite;
+}
+
+@keyframes skeleton-pulse {
+  0% { background-position: 0 0; }
+  100% { background-position: -250% 0; }
 }
 
 @media (max-width: 700px) {
