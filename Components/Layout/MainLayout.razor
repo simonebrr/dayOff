@@ -19,23 +19,23 @@
       <div class="navbar-center" id="navbar-center">
         @if (Auth.IsSuperAdmin)
         {
-          <a href="/admin" class="nav-link" onclick="closeMenu()">Admin</a>
+          <a href="/admin" class="nav-link" onclick="return navClick(event)">Admin</a>
         }
         else
         {
-          <a href="/dashboard" class="nav-link" onclick="closeMenu()">Dashboard</a>
+          <a href="/dashboard" class="nav-link" onclick="return navClick(event)">Dashboard</a>
           @if (Auth.IsCapo)
           {
-            <a href="/dipendenti" class="nav-link" onclick="closeMenu()">Dipendenti</a>
-            <a href="/richieste" class="nav-link" onclick="closeMenu()">Richieste</a>
+            <a href="/dipendenti" class="nav-link" onclick="return navClick(event)">Dipendenti</a>
+            <a href="/richieste" class="nav-link" onclick="return navClick(event)">Richieste</a>
           }
           else
           {
-            <a href="/nuova-richiesta" class="nav-link" onclick="closeMenu()">Nuova Richiesta</a>
-            <a href="/mie-richieste" class="nav-link" onclick="closeMenu()">Le mie richieste</a>
+            <a href="/nuova-richiesta" class="nav-link" onclick="return navClick(event)">Nuova Richiesta</a>
+            <a href="/mie-richieste" class="nav-link" onclick="return navClick(event)">Le mie richieste</a>
           }
-          <a href="/calendario" class="nav-link" onclick="closeMenu()">Calendario</a>
-          <a href="/profilo" class="nav-link" onclick="closeMenu()">Profilo</a>
+          <a href="/calendario" class="nav-link" onclick="return navClick(event)">Calendario</a>
+          <a href="/profilo" class="nav-link" onclick="return navClick(event)">Profilo</a>
         }
         <a href="/esci" class="nav-link nav-link-danger only-mobile" onclick="closeMenu()">Esci</a>
       </div>

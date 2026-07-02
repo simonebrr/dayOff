@@ -31,6 +31,19 @@
     if (menu) menu.classList.remove('visibile');
     if (btn) btn.classList.remove('aperto');
     }
+
+    // Chiude il menu mobile e, se il link punta alla pagina già aperta,
+    // blocca la navigazione: altrimenti Blazor ricarica il componente da
+    // zero (dati e grafici ripartono da vuoto), causando un salto visibile.
+    function navClick(e) {
+    closeMenu();
+    var target = new URL(e.currentTarget.href, window.location.href).pathname;
+    if (target === window.location.pathname) {
+    e.preventDefault();
+    return false;
+    }
+    return true;
+    }
   </script>
 </body>
 
