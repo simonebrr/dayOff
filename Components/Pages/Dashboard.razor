@@ -17,26 +17,26 @@
 {
   <div class="dashboard-header">
     <div>
-      <h2>Buongiorno, @Auth.UtenteNome 👋</h2>
+      <h2>Buongiorno, @Auth.UtenteNome</h2>
       <p class="subtitle">Pannello di controllo ferie aziendali</p>
     </div>
   </div>
 
   <div class="grid-4">
     <div class="metric-card">
-      <div class="metric-label">👥 Dipendenti</div>
+      <div class="metric-label"><Icon Name="users" /> Dipendenti</div>
       <div class="metric-value">@totaleDipendenti</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">⏳ Richieste in attesa</div>
+      <div class="metric-label"><Icon Name="clock" Class="icon-warning" /> Richieste in attesa</div>
       <div class="metric-value warning">@richiesteInAttesa</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">✅ Approvate questo mese</div>
+      <div class="metric-label"><Icon Name="check-circle" Class="icon-success" /> Approvate questo mese</div>
       <div class="metric-value success">@richiesteApprovate</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">❌ Rifiutate questo mese</div>
+      <div class="metric-label"><Icon Name="x-circle" Class="icon-danger" /> Rifiutate questo mese</div>
       <div class="metric-value danger">@richiesteRifiutate</div>
     </div>
   </div>
@@ -45,7 +45,7 @@
 
   @if (!richiesteAttesa.Any())
   {
-    <div class="empty-state">Nessuna richiesta in attesa 🎉</div>
+    <div class="empty-state"><Icon Name="check-circle" Class="icon-lg icon-success" /> Nessuna richiesta in attesa</div>
   }
   else
   {
@@ -73,8 +73,8 @@
               <td>@r.OreRichieste</td>
               <td>@(r.Note ?? "-")</td>
               <td>
-                <button class="btn-approve" @onclick="() => Approva(r.Id)">✅ Approva</button>
-                <button class="btn-reject" @onclick="() => ApriRifiuto(r.Id)">❌ Rifiuta</button>
+                <button class="btn-approve" @onclick="() => Approva(r.Id)"><Icon Name="check-circle" /> Approva</button>
+                <button class="btn-reject" @onclick="() => ApriRifiuto(r.Id)"><Icon Name="x-circle" /> Rifiuta</button>
               </td>
             </tr>
           }
@@ -85,7 +85,7 @@
 
   @if (inFerieOggi.Any())
   {
-    <div class="section-title">🏖️ In ferie oggi</div>
+    <div class="section-title"><Icon Name="sun" Class="icon-success" /> In ferie oggi</div>
     <div class="chips-row">
       @foreach (var r in inFerieOggi)
       {
@@ -96,7 +96,7 @@
 
   @if (pocheOre.Any())
   {
-    <div class="section-title">⚠️ Dipendenti con poche ore rimaste</div>
+    <div class="section-title"><Icon Name="warning" Class="icon-warning" /> Dipendenti con poche ore rimaste</div>
     <div class="chips-row">
       @foreach (var s in pocheOre)
       {
@@ -156,7 +156,7 @@ else
 {
   <div class="dashboard-header">
     <div>
-      <h2>Bentornato, @Auth.UtenteNome 👋</h2>
+      <h2>Bentornato, @Auth.UtenteNome</h2>
       <p class="subtitle">Il tuo saldo ferie</p>
     </div>
     <a href="/nuova-richiesta" class="btn-primary">+ Nuova richiesta</a>
@@ -164,15 +164,15 @@ else
 
   <div class="grid-3">
     <div class="metric-card">
-      <div class="metric-label">📅 Ore totali</div>
+      <div class="metric-label"><Icon Name="calendar" /> Ore totali</div>
       <div class="metric-value">@saldo?.OreTotali h</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">✅ Ore usate</div>
+      <div class="metric-label"><Icon Name="check-circle" Class="icon-warning" /> Ore usate</div>
       <div class="metric-value warning">@saldo?.OreUsate h</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">🟢 Ore disponibili</div>
+      <div class="metric-label"><Icon Name="dot" Class="icon-success" /> Ore disponibili</div>
       <div class="metric-value success">@saldo?.OreDisponibili h</div>
     </div>
   </div>
@@ -256,19 +256,21 @@ else
   {
     Chart = new Chart { Type = ChartType.Bar, Height = 300, Toolbar = new Toolbar { Show = false } },
     PlotOptions = new PlotOptions { Bar = new PlotOptionsBar { Horizontal = true } },
-    Legend = new Legend { Show = true }
+    Legend = new Legend { Show = true },
+    Colors = new List<string> { "#D97706", "#1D9E75" }
   };
 
   ApexChartOptions<RichiestaMese> opzioniLinea = new()
   {
     Chart = new Chart { Type = ChartType.Line, Height = 250, Toolbar = new Toolbar { Show = false } },
-    Stroke = new Stroke { Curve = Curve.Smooth, Width = new List<int> { 3 } }
+    Stroke = new Stroke { Curve = Curve.Smooth, Width = new List<int> { 3 } },
+    Colors = new List<string> { "#185FA5" }
   };
 
   ApexChartOptions<SaldoItem> opzioniDonut = new()
   {
     Chart = new Chart { Type = ChartType.Donut, Height = 250 },
-    Colors = new List<string> { "#F09595", "#1D9E75" }
+    Colors = new List<string> { "#D97706", "#1D9E75" }
   };
 
   protected override async Task OnAfterRenderAsync(bool firstRender)

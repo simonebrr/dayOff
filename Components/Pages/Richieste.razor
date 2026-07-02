@@ -18,7 +18,7 @@
 
 @if (!richieste.Any())
 {
-  <div class="empty-state">Nessuna richiesta trovata 🎉</div>
+  <div class="empty-state"><Icon Name="check-circle" Class="icon-lg icon-success" /> Nessuna richiesta trovata</div>
 }
 else
 {
@@ -53,8 +53,8 @@ else
               <td data-label="Azioni">
                 @if (r.Stato == StatoRichiesta.InAttesa)
                 {
-                  <button class="btn-approve" @onclick="() => Approva(r.Id)">✅ Approva</button>
-                  <button class="btn-reject" @onclick="() => ApriRifiuto(r.Id)">❌ Rifiuta</button>
+                  <button class="btn-approve" @onclick="() => Approva(r.Id)"><Icon Name="check-circle" /> Approva</button>
+                  <button class="btn-reject" @onclick="() => ApriRifiuto(r.Id)"><Icon Name="x-circle" /> Rifiuta</button>
                 }
               </td>
             </tr>

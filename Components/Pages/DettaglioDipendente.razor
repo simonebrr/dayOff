@@ -20,24 +20,24 @@ else
 {
   <div class="page-header">
     <div class="header-left">
-      <a href="/dipendenti" class="btn-back">← Torna ai dipendenti</a>
+      <a href="/dipendenti" class="btn-back"><Icon Name="arrow-left" Class="icon-sm" /> Torna ai dipendenti</a>
       <h2>@utente.Nome @utente.Cognome</h2>
       <p class="subtitle">@utente.Email</p>
     </div>
-    <button class="btn-danger" @onclick="() => mostraConfermaElimina = true">🗑️ Elimina dipendente</button>
+    <button class="btn-danger" @onclick="() => mostraConfermaElimina = true"><Icon Name="trash" /> Elimina dipendente</button>
   </div>
 
   <div class="grid-3">
     <div class="metric-card">
-      <div class="metric-label">📅 Ore totali @DateTime.Now.Year</div>
+      <div class="metric-label"><Icon Name="calendar" /> Ore totali @DateTime.Now.Year</div>
       <div class="metric-value">@(saldo?.OreTotali ?? 0) h</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">✅ Ore usate</div>
+      <div class="metric-label"><Icon Name="check-circle" Class="icon-warning" /> Ore usate</div>
       <div class="metric-value warning">@(saldo?.OreUsate ?? 0) h</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">🟢 Ore disponibili</div>
+      <div class="metric-label"><Icon Name="dot" Class="icon-success" /> Ore disponibili</div>
       <div class="metric-value success">@(saldo?.OreDisponibili ?? 0) h</div>
     </div>
   </div>
@@ -53,7 +53,7 @@ else
     </div>
   }
 
-  <div class="section-title">📋 Storico richieste</div>
+  <div class="section-title"><Icon Name="clipboard-list" /> Storico richieste</div>
 
   @if (!richieste.Any())
   {
@@ -92,7 +92,7 @@ else
     </div>
   }
 
-  <div class="section-title">🕐 Storico modifiche saldo</div>
+  <div class="section-title"><Icon Name="clock" /> Storico modifiche saldo</div>
 
   @if (!logModifiche.Any())
   {
@@ -120,7 +120,7 @@ else
               <td>@log.OreNuove h</td>
               <td>@log.ModificatoDa</td>
               <td>
-                <button class="btn-edit" @onclick="() => Ripristina(log)">↩️ Ripristina</button>
+                <button class="btn-edit" @onclick="() => Ripristina(log)"><Icon Name="undo" /> Ripristina</button>
               </td>
             </tr>
           }
@@ -165,7 +165,7 @@ else
   ApexChartOptions<SaldoItem> opzioniDonut = new()
   {
     Chart = new Chart { Type = ChartType.Donut, Height = 250 },
-    Colors = new List<string> { "#F09595", "#1D9E75" }
+    Colors = new List<string> { "#D97706", "#1D9E75" }
   };
 
   protected override async Task OnAfterRenderAsync(bool firstRender)

@@ -32,18 +32,18 @@
     <label>Tipo</label>
     <select @bind="tipoScelto" @bind:after="Filtra">
       <option value="">Tutti</option>
-      <option value="Ferie">🌴 Ferie</option>
-      <option value="Permesso">🕐 Permesso</option>
-      <option value="Malattia">🤒 Malattia</option>
+      <option value="Ferie">Ferie</option>
+      <option value="Permesso">Permesso</option>
+      <option value="Malattia">Malattia</option>
     </select>
   </div>
   <div class="filtro-group">
     <label>Stato</label>
     <select @bind="statoScelto" @bind:after="Filtra">
       <option value="">Tutti</option>
-      <option value="InAttesa">⏳ In attesa</option>
-      <option value="Approvata">✅ Approvata</option>
-      <option value="Rifiutata">❌ Rifiutata</option>
+      <option value="InAttesa">In attesa</option>
+      <option value="Approvata">Approvata</option>
+      <option value="Rifiutata">Rifiutata</option>
     </select>
   </div>
   @if (Auth.IsCapo)
@@ -58,7 +58,7 @@
           @if (!string.IsNullOrEmpty(cercaDipendente))
           {
             <div class="autocomplete-item reset" @onclick="ResetDipendente">
-              ✕ Tutti i dipendenti
+              <Icon Name="x" Class="icon-sm" /> Tutti i dipendenti
             </div>
           }
           @foreach (var d in suggerimenti)
@@ -75,7 +75,7 @@
 
 @if (!richieste.Any())
 {
-  <div class="empty-state">Nessuna richiesta trovata per i filtri selezionati 📅</div>
+  <div class="empty-state"><Icon Name="calendar" Class="icon-lg icon-muted" /> Nessuna richiesta trovata per i filtri selezionati</div>
 }
 else
 {
@@ -122,7 +122,7 @@ else
               <td>
                 @if (r.Stato == StatoRichiesta.InAttesa || r.Stato == StatoRichiesta.Approvata)
                 {
-                  <button class="btn-elimina" @onclick="() => ApriConfermaElimina(r.Id)">🗑️ Elimina</button>
+                  <button class="btn-elimina" @onclick="() => ApriConfermaElimina(r.Id)"><Icon Name="trash" Class="icon-sm" /> Elimina</button>
                 }
               </td>
             }
@@ -160,10 +160,10 @@ else
       <p>Sei sicuro di voler eliminare questa richiesta?</p>
       @if (richiestaConfermaStato == StatoRichiesta.Approvata)
       {
-        <p class="modal-warning">⚠️ Questa richiesta è già approvata — le ore verranno restituite al tuo saldo.</p>
+        <p class="modal-warning"><Icon Name="warning" Class="icon-sm" /> Questa richiesta è già approvata — le ore verranno restituite al tuo saldo.</p>
       }
       <div class="modal-actions">
-        <button class="btn-elimina" @onclick="ConfermaElimina">🗑️ Elimina</button>
+        <button class="btn-elimina" @onclick="ConfermaElimina"><Icon Name="trash" Class="icon-sm" /> Elimina</button>
         <button class="btn-cancel" @onclick="() => mostraConfermaElimina = false">Annulla</button>
       </div>
     </div>

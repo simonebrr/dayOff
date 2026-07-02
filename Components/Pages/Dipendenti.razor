@@ -17,15 +17,15 @@
   <div class="header-actions">
     @if (!modificaMassiva)
     {
-      <button class="btn-secondary" @onclick="AttivaModificaMassiva">✏️ Modifica tutti</button>
-      <button class="btn-secondary" @onclick="() => mostraModalAssegnaTutti = true">📋 Assegna a tutti</button>
+      <button class="btn-secondary" @onclick="AttivaModificaMassiva"><Icon Name="pencil" /> Modifica tutti</button>
+      <button class="btn-secondary" @onclick="() => mostraModalAssegnaTutti = true"><Icon Name="clipboard-list" /> Assegna a tutti</button>
     }
     else
     {
-      <button class="btn-primary" @onclick="SalvaTutti">💾 Salva tutto</button>
+      <button class="btn-primary" @onclick="SalvaTutti"><Icon Name="save" /> Salva tutto</button>
       <button class="btn-cancel" @onclick="AnnullaModificaMassiva">Annulla</button>
     }
-    <button class="btn-secondary" @onclick="() => mostraModalCsv = true">📥 Importa CSV</button>
+    <button class="btn-secondary" @onclick="() => mostraModalCsv = true"><Icon Name="download" /> Importa CSV</button>
     <button class="btn-primary" @onclick="() => mostraModalNuovo = true">+ Nuovo dipendente</button>
   </div>
 </div>
@@ -37,7 +37,7 @@
 
 @if (!dipendenti.Any())
 {
-  <div class="empty-state">Nessun dipendente ancora. Aggiungine uno! 👆</div>
+  <div class="empty-state">Nessun dipendente ancora. Aggiungine uno!</div>
 }
 else
 {
@@ -85,13 +85,13 @@ else
               {
                 @if (modificaSaldoId == d.Utente.Id)
                 {
-                  <button class="btn-approve" @onclick="() => SalvaSaldo(d.Utente.Id)">✅ Salva</button>
+                  <button class="btn-approve" @onclick="() => SalvaSaldo(d.Utente.Id)"><Icon Name="check-circle" /> Salva</button>
                   <button class="btn-cancel" @onclick="AnnullaModifica">Annulla</button>
                 }
                 else
                 {
-                  <button class="btn-edit" @onclick="() => ApriModificaSaldo(d.Utente.Id, d.Saldo?.OreTotali ?? 0)">✏️
-                    Saldo</button>
+                  <button class="btn-edit" @onclick="() => ApriModificaSaldo(d.Utente.Id, d.Saldo?.OreTotali ?? 0)">
+                    <Icon Name="pencil" /> Saldo</button>
                   }
                 }
               </td>

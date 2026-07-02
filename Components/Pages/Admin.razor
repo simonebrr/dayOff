@@ -23,7 +23,7 @@
 
 @if (!aziende.Any())
 {
-  <div class="empty-state">Nessuna azienda ancora. Creane una! 👆</div>
+  <div class="empty-state">Nessuna azienda ancora. Creane una!</div>
 }
 else
 {
@@ -49,8 +49,8 @@ else
             <td>@(string.IsNullOrEmpty(a.EmailMalattia) ? "— (va al capo)" : a.EmailMalattia)</td>
             <td>@conteggioUtenti.GetValueOrDefault(a.Id)</td>
             <td>
-              <button class="btn-edit" @onclick="() => ApriModifica(a)">✏️ Modifica</button>
-              <button class="btn-danger" @onclick="() => ApriConfermaElimina(a)">🗑️ Elimina</button>
+              <button class="btn-edit" @onclick="() => ApriModifica(a)"><Icon Name="pencil" /> Modifica</button>
+              <button class="btn-danger" @onclick="() => ApriConfermaElimina(a)"><Icon Name="trash" /> Elimina</button>
             </td>
           </tr>
         }
@@ -131,9 +131,9 @@ else
     <div class="modal">
       <h3>Conferma eliminazione</h3>
       <p>Sei sicuro di voler eliminare <strong>@aziendaDaEliminare?.Nome</strong>?</p>
-      <p style="color:#A32D2D; font-size:0.9rem">⚠️ Verranno eliminati anche tutti i dipendenti, le richieste e i saldi ferie associati.</p>
+      <p style="color:#A32D2D; font-size:0.9rem"><Icon Name="warning" Class="icon-sm" /> Verranno eliminati anche tutti i dipendenti, le richieste e i saldi ferie associati.</p>
       <div class="modal-actions">
-        <button class="btn-danger" @onclick="ConfermaElimina">🗑️ Elimina definitivamente</button>
+        <button class="btn-danger" @onclick="ConfermaElimina"><Icon Name="trash" /> Elimina definitivamente</button>
         <button class="btn-cancel" @onclick="() => mostraConfermaElimina = false">Annulla</button>
       </div>
     </div>

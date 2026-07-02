@@ -40,7 +40,7 @@
   else
   {
     <div class="alert alert-error">
-      ⚠️ Nessun saldo ferie assegnato per il @DateTime.Now.Year. Contatta il responsabile.
+      <Icon Name="warning" /> Nessun saldo ferie assegnato per il @DateTime.Now.Year. Contatta il responsabile.
     </div>
   }
 }
@@ -49,9 +49,9 @@
   <div class="form-group">
     <label>Tipo richiesta</label>
     <select @bind="tipo" @bind:after="CalcolaOre">
-      <option value="Ferie">🌴 Ferie</option>
-      <option value="Permesso">🕐 Permesso</option>
-      <option value="Malattia">🤒 Malattia</option>
+      <option value="Ferie">Ferie</option>
+      <option value="Permesso">Permesso</option>
+      <option value="Malattia">Malattia</option>
     </select>
   </div>
 
@@ -101,7 +101,7 @@
           <span>Dopo la richiesta: <strong>@(saldo.OreDisponibili - ore)</strong></span>
           @if (saldo.OreDisponibili - ore < 0)
           {
-            <span class="warning-text">⚠️ Ore insufficienti!</span>
+            <span class="warning-text"><Icon Name="warning" Class="icon-sm" /> Ore insufficienti!</span>
           }
         </div>
       }
@@ -120,7 +120,7 @@
           <span>Dopo la richiesta: <strong>@(saldo.OreDisponibili - ore)</strong></span>
           @if (saldo.OreDisponibili - ore < 0)
           {
-            <span class="warning-text">⚠️ Ore insufficienti!</span>
+            <span class="warning-text"><Icon Name="warning" Class="icon-sm" /> Ore insufficienti!</span>
           }
         </div>
       }
@@ -144,7 +144,7 @@
 {
   <div class="modal-overlay">
     <div class="modal-box">
-      <h3>⚠️ Preavviso insufficiente</h3>
+      <h3><Icon Name="warning" Class="icon-warning" /> Preavviso insufficiente</h3>
       @{
         var giorniMancanti = (int)(dataInizio.Date - DateTime.Today.Date).TotalDays;
         var giorniTesto = giorniMancanti == 1 ? "1 giorno" : $"{giorniMancanti} giorni";
