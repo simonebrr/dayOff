@@ -8,20 +8,23 @@ using GestioneFerie.Web.Models;
 namespace GestioneFerie.Web.Services;
 
 /// <summary>
-/// Sincronizza le richieste di ferie/permessi/malattia con un calendario Google
-/// condiviso, visibile a tutti gli account che vi sono iscritti.
+/// Sincronizza le richieste di ferie/permessi/malattia con i calendari Google
+/// delle aziende. App multi-azienda: un unico service account (credenziali
+/// globali) scrive su tanti calendari, uno per azienda; l'id del calendario è
+/// salvato su <c>Azienda.GoogleCalendarId</c> e passato ai metodi di sync.
 ///
 /// Autenticazione tramite service account (server-to-server): non serve alcun
-/// login utente. Il calendario condiviso va condiviso con l'email del service
+/// login utente. Ogni calendario aziendale va condiviso con l'email del service
 /// account concedendo il permesso "Apportare modifiche agli eventi".
 ///
-/// Configurazione (appsettings / variabili d'ambiente):
-///   GoogleCalendar:CalendarId              -> id del calendario condiviso
+/// Configurazione globale (appsettings / variabili d'ambiente):
 ///   GoogleCalendar:ServiceAccountKeyJson   -> contenuto JSON della chiave (opzionale)
 ///   GoogleCalendar:ServiceAccountKeyPath   -> percorso al file JSON della chiave (opzionale)
+///   GoogleCalendar:ServiceAccountEmail     -> email del service account (solo informativa)
 ///   GoogleCalendar:TimeZone                -> es. "Europe/Rome" (default)
 ///
-/// Se non configurato, il servizio è un no-op sicuro: l'app funziona comunque.
+/// Se le credenziali non sono configurate (o un'azienda non ha un calendarId),
+/// i metodi di sync sono no-op sicuri: l'app funziona comunque.
 /// </summary>
 public class GoogleCalendarService
 {
@@ -36,7 +39,6 @@ public class GoogleCalendarService
     _logger = logger;
   }
 
-  private string CalendarId => _config["GoogleCalendar:CalendarId"] ?? "";
   private string TimeZone => _config["GoogleCalendar:TimeZone"] ?? "Europe/Rome";
 
   /// <summary>Calendario pubblico Google delle festività italiane.</summary>
@@ -44,10 +46,8 @@ public class GoogleCalendarService
 
   private readonly Dictionary<int, HashSet<DateTime>> _festiviCache = new();
 
-  public bool Configurato =>
-      !string.IsNullOrWhiteSpace(CalendarId) && CredenzialiDisponibili();
-
-  private bool CredenzialiDisponibili()
+  /// <summary>True se il service account (credenziali globali) è configurato.</summary>
+  public bool CredenzialiDisponibili()
   {
     var json = _config["GoogleCalendar:ServiceAccountKeyJson"];
     var path = _config["GoogleCalendar:ServiceAccountKeyPath"];
@@ -57,7 +57,7 @@ public class GoogleCalendarService
 
   private CalendarService? GetService()
   {
-    if (!Configurato) return null;
+    if (!CredenzialiDisponibili()) return null;
     if (_service != null) return _service;
 
     lock (_lock)
@@ -94,8 +94,9 @@ public class GoogleCalendarService
   /// Ritorna l'id dell'evento da salvare in <see cref="RichiestaFerie.GoogleCalendarEventId"/>,
   /// oppure il valore esistente in caso di errore o servizio non configurato.
   /// </summary>
-  public async Task<string?> CreaOAggiornaEventoAsync(RichiestaFerie r, string nome)
+  public async Task<string?> CreaOAggiornaEventoAsync(RichiestaFerie r, string nome, string? calendarId)
   {
+    if (string.IsNullOrWhiteSpace(calendarId)) return r.GoogleCalendarEventId;
     var svc = GetService();
     if (svc == null) return r.GoogleCalendarEventId;
 
@@ -106,18 +107,18 @@ public class GoogleCalendarService
       {
         try
         {
-          var aggiornato = await svc.Events.Update(ev, CalendarId, r.GoogleCalendarEventId).ExecuteAsync();
+          var aggiornato = await svc.Events.Update(ev, calendarId, r.GoogleCalendarEventId).ExecuteAsync();
           return aggiornato.Id;
         }
         catch (GoogleApiException)
         {
           // L'evento non esiste più: lo ricreiamo.
-          var ricreato = await svc.Events.Insert(ev, CalendarId).ExecuteAsync();
+          var ricreato = await svc.Events.Insert(ev, calendarId).ExecuteAsync();
           return ricreato.Id;
         }
       }
 
-      var creato = await svc.Events.Insert(ev, CalendarId).ExecuteAsync();
+      var creato = await svc.Events.Insert(ev, calendarId).ExecuteAsync();
       return creato.Id;
     }
     catch (Exception ex)
@@ -127,16 +128,16 @@ public class GoogleCalendarService
     }
   }
 
-  /// <summary>Rimuove l'evento dal calendario condiviso (no-op se non collegato).</summary>
-  public async Task RimuoviEventoAsync(string? eventId)
+  /// <summary>Rimuove l'evento dal calendario dell'azienda (no-op se non collegato).</summary>
+  public async Task RimuoviEventoAsync(string? eventId, string? calendarId)
   {
-    if (string.IsNullOrWhiteSpace(eventId)) return;
+    if (string.IsNullOrWhiteSpace(eventId) || string.IsNullOrWhiteSpace(calendarId)) return;
     var svc = GetService();
     if (svc == null) return;
 
     try
     {
-      await svc.Events.Delete(CalendarId, eventId).ExecuteAsync();
+      await svc.Events.Delete(calendarId, eventId).ExecuteAsync();
     }
     catch (Exception ex)
     {

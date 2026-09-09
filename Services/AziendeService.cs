@@ -31,7 +31,8 @@ public class AziendeService
   }
 
   public async Task<(bool Success, string Messaggio)> CreaAsync(
-      string nomeAzienda, string? emailMalattia, string nomeCapo, string cognomeCapo, string emailCapo)
+      string nomeAzienda, string? emailMalattia, string nomeCapo, string cognomeCapo, string emailCapo,
+      string? googleCalendarId = null)
   {
     using var db = _dbFactory.CreateDbContext();
 
@@ -55,6 +56,7 @@ public class AziendeService
     {
       Nome = nomeAzienda,
       EmailMalattia = string.IsNullOrWhiteSpace(emailMalattia) ? null : emailMalattia,
+      GoogleCalendarId = string.IsNullOrWhiteSpace(googleCalendarId) ? null : googleCalendarId.Trim(),
       CapoId = capo.Id
     };
     db.Aziende.Add(azienda);
@@ -69,7 +71,8 @@ public class AziendeService
     return (true, $"Azienda \"{nomeAzienda}\" creata! Credenziali inviate a {emailCapo}.");
   }
 
-  public async Task<bool> SalvaModificaAsync(int aziendaId, string nome, string? emailMalattia)
+  public async Task<bool> SalvaModificaAsync(int aziendaId, string nome, string? emailMalattia,
+      string? googleCalendarId = null)
   {
     using var db = _dbFactory.CreateDbContext();
     var azienda = await db.Aziende.FindAsync(aziendaId);
@@ -77,6 +80,19 @@ public class AziendeService
 
     azienda.Nome = nome;
     azienda.EmailMalattia = string.IsNullOrWhiteSpace(emailMalattia) ? null : emailMalattia;
+    azienda.GoogleCalendarId = string.IsNullOrWhiteSpace(googleCalendarId) ? null : googleCalendarId.Trim();
+    await db.SaveChangesAsync();
+    return true;
+  }
+
+  /// <summary>Aggiorna solo l'ID del Google Calendar dell'azienda (usato dal capo).</summary>
+  public async Task<bool> SalvaGoogleCalendarIdAsync(int aziendaId, string? googleCalendarId)
+  {
+    using var db = _dbFactory.CreateDbContext();
+    var azienda = await db.Aziende.FindAsync(aziendaId);
+    if (azienda == null) return false;
+
+    azienda.GoogleCalendarId = string.IsNullOrWhiteSpace(googleCalendarId) ? null : googleCalendarId.Trim();
     await db.SaveChangesAsync();
     return true;
   }

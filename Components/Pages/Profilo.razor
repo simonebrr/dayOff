@@ -2,6 +2,8 @@
 @inject IDbContextFactory<AppDbContext> DbFactory
 @inject AuthService Auth
 @inject NavigationManager Nav
+@inject AziendeService Aziende
+@inject IConfiguration _config
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @using GestioneFerie.Web.Data
@@ -79,6 +81,23 @@
             }
           </span>
         </div>
+
+        <div class="gcal-config">
+          <label class="gcal-label"><Icon Name="calendar" Class="icon-sm" /> ID Google Calendar aziendale</label>
+          <input type="text" @bind="googleCalendarId" placeholder="xxxxxxxx@group.calendar.google.com" />
+          <span class="hint">
+            Crea un calendario Google per il team e incolla qui il suo ID (Impostazioni calendario → «Integra calendario» → ID calendario).
+            @if (!string.IsNullOrWhiteSpace(serviceAccountEmail))
+            {
+              <text>Ricordati di condividerlo con <strong>@serviceAccountEmail</strong> (permesso «Apportare modifiche agli eventi»).</text>
+            }
+            else
+            {
+              <text>Va condiviso con l'email del service account con permesso «Apportare modifiche agli eventi».</text>
+            }
+          </span>
+          <button class="btn-primary" @onclick="SalvaCalendario">Salva calendario</button>
+        </div>
       </div>
     }
   </div>
@@ -114,6 +133,9 @@
   int statInAttesa;
   decimal statOreTotali;
 
+  string googleCalendarId = "";
+  string? serviceAccountEmail;
+
   protected override async Task OnAfterRenderAsync(bool firstRender)
   {
     if (firstRender)
@@ -136,6 +158,8 @@
     if (Auth.IsCapo && Auth.AziendaId != null)
     {
       azienda = await db.Aziende.FindAsync(Auth.AziendaId);
+      googleCalendarId = azienda?.GoogleCalendarId ?? "";
+      serviceAccountEmail = _config["GoogleCalendar:ServiceAccountEmail"];
 
       statDipendenti = await db.Utenti
           .CountAsync(u => u.AziendaId == Auth.AziendaId && u.Ruolo == Ruolo.Dipendente);
@@ -147,6 +171,16 @@
           .Where(s => s.Anno == DateTime.Now.Year && s.Utente.AziendaId == Auth.AziendaId)
           .SumAsync(s => s.OreTotali);
     }
+  }
+
+  async Task SalvaCalendario()
+  {
+    if (Auth.AziendaId == null) return;
+    await Aziende.SalvaGoogleCalendarIdAsync(Auth.AziendaId.Value, googleCalendarId);
+    if (azienda != null)
+      azienda.GoogleCalendarId = string.IsNullOrWhiteSpace(googleCalendarId) ? null : googleCalendarId.Trim();
+    messaggio = "Calendario aziendale aggiornato!";
+    errore = false;
   }
 
   async Task CambiaPassword()

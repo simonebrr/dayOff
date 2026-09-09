@@ -73,6 +73,10 @@ else
         <label>Email malattia <span class="hint">(opzionale)</span></label>
         <input type="email" @bind="nuovaEmailMalattia" placeholder="hr@azienda.it" />
       </div>
+      <div class="form-group">
+        <label>ID Google Calendar <span class="hint">(opzionale)</span></label>
+        <input type="text" @bind="nuovoGoogleCalendarId" placeholder="xxxxxxxx@group.calendar.google.com" />
+      </div>
 
       <hr style="margin: 1rem 0; border-color: #eee;" />
       <p style="font-weight:600; margin-bottom:.75rem;">Dati del capo</p>
@@ -116,6 +120,10 @@ else
         <label>Email malattia <span class="hint">(opzionale — se vuota, va al capo)</span></label>
         <input type="email" @bind="modificaEmailMalattia" placeholder="hr@azienda.it" />
       </div>
+      <div class="form-group">
+        <label>ID Google Calendar <span class="hint">(opzionale)</span></label>
+        <input type="text" @bind="modificaGoogleCalendarId" placeholder="xxxxxxxx@group.calendar.google.com" />
+      </div>
 
       <div class="modal-actions">
         <button class="btn-primary" @onclick="SalvaModifica">Salva</button>
@@ -150,6 +158,7 @@ else
 
   string nuovoNomeAzienda = "";
   string nuovaEmailMalattia = "";
+  string nuovoGoogleCalendarId = "";
   string nuovoNomeCapo = "";
   string nuovoCognomeCapo = "";
   string nuovaEmailCapo = "";
@@ -158,6 +167,7 @@ else
   int modificaAziendaId;
   string modificaNome = "";
   string modificaEmailMalattia = "";
+  string modificaGoogleCalendarId = "";
 
   bool mostraConfermaElimina = false;
   GestioneFerie.Web.Models.Azienda? aziendaDaEliminare;
@@ -187,6 +197,7 @@ else
     modificaAziendaId = a.Id;
     modificaNome = a.Nome;
     modificaEmailMalattia = a.EmailMalattia ?? "";
+    modificaGoogleCalendarId = a.GoogleCalendarId ?? "";
     mostraModalModifica = true;
   }
 
@@ -218,7 +229,7 @@ else
       return;
     }
 
-    await Aziende.SalvaModificaAsync(modificaAziendaId, modificaNome, modificaEmailMalattia);
+    await Aziende.SalvaModificaAsync(modificaAziendaId, modificaNome, modificaEmailMalattia, modificaGoogleCalendarId);
     mostraModalModifica = false;
     messaggio = "Azienda aggiornata!";
     errore = false;
@@ -238,7 +249,7 @@ else
 
     creando = true;
 
-    var (success, msg) = await Aziende.CreaAsync(nuovoNomeAzienda, nuovaEmailMalattia, nuovoNomeCapo, nuovoCognomeCapo, nuovaEmailCapo);
+    var (success, msg) = await Aziende.CreaAsync(nuovoNomeAzienda, nuovaEmailMalattia, nuovoNomeCapo, nuovoCognomeCapo, nuovaEmailCapo, nuovoGoogleCalendarId);
     messaggio = msg;
     errore = !success;
     creando = false;
@@ -252,6 +263,6 @@ else
   void ChiudiModal()
   {
     mostraModalNuova = false;
-    nuovoNomeAzienda = nuovaEmailMalattia = nuovoNomeCapo = nuovoCognomeCapo = nuovaEmailCapo = "";
+    nuovoNomeAzienda = nuovaEmailMalattia = nuovoGoogleCalendarId = nuovoNomeCapo = nuovoCognomeCapo = nuovaEmailCapo = "";
   }
 }

@@ -348,6 +348,9 @@ else
 
     if (Auth.IsCapo)
     {
+      var azienda = await db.Aziende.FindAsync(Auth.AziendaId);
+      aziendaCalendarId = azienda?.GoogleCalendarId;
+
       dipendenti = await db.Utenti
           .Where(u => u.Ruolo == Ruolo.Dipendente && u.AziendaId == Auth.AziendaId)
           .ToListAsync();
@@ -379,21 +382,20 @@ else
     }).ToList();
   }
 
-  // ---- Google Calendar (condiviso, visibile al capo) ----
+  // ---- Google Calendar dell'azienda (visibile al capo) ----
+  string? aziendaCalendarId;
+
   bool MostraEmbed => Auth.IsCapo && EmbedSrc != null;
 
   string? EmbedSrc
   {
     get
     {
-      var custom = _config["GoogleCalendar:EmbedSrc"];
-      if (!string.IsNullOrWhiteSpace(custom)) return custom;
-      var id = _config["GoogleCalendar:CalendarId"];
-      if (string.IsNullOrWhiteSpace(id)) return null;
+      if (string.IsNullOrWhiteSpace(aziendaCalendarId)) return null;
       var tz = _config["GoogleCalendar:TimeZone"] ?? "Europe/Rome";
       // Overlay del calendario pubblico delle festività italiane (festivi rossi da Google).
       var festiviSrc = Uri.EscapeDataString(GoogleCalendarService.FestivitaCalendarId);
-      return $"https://calendar.google.com/calendar/embed?src={Uri.EscapeDataString(id)}&src={festiviSrc}&ctz={Uri.EscapeDataString(tz)}&mode=MONTH";
+      return $"https://calendar.google.com/calendar/embed?src={Uri.EscapeDataString(aziendaCalendarId)}&src={festiviSrc}&ctz={Uri.EscapeDataString(tz)}&mode=MONTH";
     }
   }
 
