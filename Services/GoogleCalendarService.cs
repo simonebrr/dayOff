@@ -191,10 +191,12 @@ public class GoogleCalendarService
       {
         GoogleCredential credential;
         var json = _config["GoogleCalendar:ServiceAccountKeyJson"];
+#pragma warning disable CS0618 // FromJson/FromFile deprecati: ancora validi per il service account
         if (!string.IsNullOrWhiteSpace(json))
           credential = GoogleCredential.FromJson(json);
         else
           credential = GoogleCredential.FromFile(_config["GoogleCalendar:ServiceAccountKeyPath"]!);
+#pragma warning restore CS0618
 
         credential = credential.CreateScoped(CalendarService.Scope.Calendar);
 
