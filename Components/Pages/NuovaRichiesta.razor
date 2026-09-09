@@ -2,6 +2,7 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject RichiesteService Richieste
+@inject GoogleCalendarService GCal
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @rendermode InteractiveServer
@@ -114,8 +115,19 @@
       <label>Giorni lavorativi selezionati</label>
       <div class="ore-display">
         <span class="ore-numero">@giorniLavorativi</span>
-        <span class="ore-label">giorni → <strong>@ore ore</strong> (esclusi weekend e festivi italiani)</span>
+        <span class="ore-label">giorni → <strong>@ore ore</strong> (esclusi weekend e festivi)</span>
       </div>
+      @if (festiviPeriodo.Any())
+      {
+        <div class="festivi-periodo">
+          <Icon Name="calendar" Class="icon-sm" />
+          <span>Festività nel periodo (non conteggiate):</span>
+          @foreach (var f in festiviPeriodo)
+          {
+            <span class="festivo-tag">@f.ToString("dd/MM")</span>
+          }
+        </div>
+      }
       @if (saldo != null)
       {
         <div class="saldo-preview @(saldo.OreDisponibili - ore < 0 ? "saldo-negativo" : "saldo-positivo")">
@@ -225,20 +237,42 @@
     await CalcolaOre();
   }
 
-  Task CalcolaOre()
+  readonly Dictionary<int, HashSet<DateTime>> _festiviAnno = new();
+  List<DateTime> festiviPeriodo = new();
+
+  async Task<HashSet<DateTime>> EnsureFestivi(int anno)
+  {
+    if (!_festiviAnno.TryGetValue(anno, out var s))
+    {
+      s = await GCal.GetFestiviAsync(anno);
+      _festiviAnno[anno] = s;
+    }
+    return s;
+  }
+
+  async Task CalcolaOre()
   {
     if (tipo == "Ferie")
     {
-      giorniLavorativi = HolidayCalculator.GiorniLavorativi(dataInizio, dataFine);
+      var festivi = new HashSet<DateTime>(await EnsureFestivi(dataInizio.Year));
+      if (dataFine.Year != dataInizio.Year)
+        festivi.UnionWith(await EnsureFestivi(dataFine.Year));
+
+      giorniLavorativi = HolidayCalculator.GiorniLavorativi(dataInizio, dataFine, festivi);
       ore = giorniLavorativi * 8;
+
+      festiviPeriodo = new();
+      if (dataFine.Date >= dataInizio.Date)
+        for (var d = dataInizio.Date; d <= dataFine.Date; d = d.AddDays(1))
+          if (festivi.Contains(d.Date)) festiviPeriodo.Add(d);
     }
     else
     {
       giorniLavorativi = 0;
+      festiviPeriodo = new();
       if (tipo == "Malattia") ore = 0;
     }
     StateHasChanged();
-    return Task.CompletedTask;
   }
 
   async Task InviaRichiesta()

@@ -32,6 +32,17 @@ public static class HolidayCalculator
     if (dataFine.Year != dataInizio.Year)
       festivi.UnionWith(FestivitaItaliane(dataFine.Year));
 
+    return GiorniLavorativi(dataInizio, dataFine, festivi);
+  }
+
+  /// <summary>
+  /// Come <see cref="GiorniLavorativi(DateTime, DateTime)"/> ma usando un insieme
+  /// di festività fornito dall'esterno (es. letto da Google Calendar).
+  /// </summary>
+  public static int GiorniLavorativi(DateTime dataInizio, DateTime dataFine, HashSet<DateTime> festivi)
+  {
+    if (dataFine.Date < dataInizio.Date) return 0;
+
     var giorni = 0;
     for (var d = dataInizio.Date; d <= dataFine.Date; d = d.AddDays(1))
     {

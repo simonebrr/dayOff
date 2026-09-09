@@ -39,6 +39,11 @@ public class GoogleCalendarService
   private string CalendarId => _config["GoogleCalendar:CalendarId"] ?? "";
   private string TimeZone => _config["GoogleCalendar:TimeZone"] ?? "Europe/Rome";
 
+  /// <summary>Calendario pubblico Google delle festività italiane.</summary>
+  public const string FestivitaCalendarId = "it.italian#holiday@group.v.calendar.google.com";
+
+  private readonly Dictionary<int, HashSet<DateTime>> _festiviCache = new();
+
   public bool Configurato =>
       !string.IsNullOrWhiteSpace(CalendarId) && CredenzialiDisponibili();
 
@@ -136,6 +141,59 @@ public class GoogleCalendarService
     catch (Exception ex)
     {
       _logger.LogWarning(ex, "Impossibile eliminare l'evento Google Calendar {EventId}", eventId);
+    }
+  }
+
+  /// <summary>
+  /// Restituisce le date festive dell'anno lette dal calendario pubblico Google
+  /// delle festività italiane. Se Google non è configurato o la lettura fallisce,
+  /// ricade sul calcolo locale (<see cref="HolidayCalculator"/>).
+  /// </summary>
+  public async Task<HashSet<DateTime>> GetFestiviAsync(int anno)
+  {
+    lock (_lock)
+    {
+      if (_festiviCache.TryGetValue(anno, out var cached)) return cached;
+    }
+
+    var risultato = await LeggiFestiviDaGoogleAsync(anno)
+                    ?? HolidayCalculator.FestivitaItaliane(anno);
+
+    lock (_lock)
+    {
+      _festiviCache[anno] = risultato;
+    }
+    return risultato;
+  }
+
+  private async Task<HashSet<DateTime>?> LeggiFestiviDaGoogleAsync(int anno)
+  {
+    var svc = GetService();
+    if (svc == null) return null;
+
+    try
+    {
+      var req = svc.Events.List(FestivitaCalendarId);
+      req.TimeMinDateTimeOffset = new DateTimeOffset(new DateTime(anno, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+      req.TimeMaxDateTimeOffset = new DateTimeOffset(new DateTime(anno + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+      req.SingleEvents = true;
+
+      var res = await req.ExecuteAsync();
+      var set = new HashSet<DateTime>();
+      if (res.Items != null)
+      {
+        foreach (var ev in res.Items)
+        {
+          if (DateTime.TryParse(ev.Start?.Date, out var d))
+            set.Add(d.Date);
+        }
+      }
+      return set.Count > 0 ? set : null;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogWarning(ex, "Impossibile leggere le festività da Google Calendar per l'anno {Anno}", anno);
+      return null;
     }
   }
 

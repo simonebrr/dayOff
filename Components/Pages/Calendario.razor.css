@@ -371,6 +371,19 @@
   font-weight: 600;
 }
 
+.cal-daynum.rosso {
+  color: var(--color-danger-strong);
+  font-weight: 600;
+}
+
+.cal-cell.festivo {
+  background: rgba(229, 62, 62, 0.045);
+}
+
+.cal-weekday:last-child {
+  color: var(--color-danger);
+}
+
 .cal-cell.oggi {
   background: #F1FAF6;
 }

@@ -4,6 +4,7 @@
 @inject NavigationManager Nav
 @inject IConfiguration _config
 @inject RichiesteService Richieste
+@inject GoogleCalendarService GCal
 @using System.Globalization
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
@@ -118,9 +119,12 @@
         var eventi = EventiDelGiorno(giorno);
         var fuoriMese = giorno.Month != meseCorrente.Month;
         var oggi = giorno.Date == DateTime.Today;
-        <div class="cal-cell @(fuoriMese ? "fuori-mese" : "") @(oggi ? "oggi" : "") @(eventi.Any() ? "ha-eventi" : "")"
+        var festivo = IsFestivo(giorno);
+        var rosso = festivo || giorno.DayOfWeek == DayOfWeek.Sunday;
+        <div class="cal-cell @(fuoriMese ? "fuori-mese" : "") @(oggi ? "oggi" : "") @(festivo ? "festivo" : "") @(eventi.Any() ? "ha-eventi" : "")"
+             title="@(festivo ? "Festività" : null)"
              @onclick="() => ApriGiorno(giorno, eventi)">
-          <div class="cal-daynum @(oggi ? "oggi-num" : "")">@giorno.Day</div>
+          <div class="cal-daynum @(oggi ? "oggi-num" : "") @(rosso && !oggi ? "rosso" : "")">@giorno.Day</div>
           <div class="cal-eventi">
             @foreach (var r in eventi.Take(3))
             {
@@ -327,6 +331,7 @@ else
       }
       await CancellaScaduteInAttesa();
       await CaricaRichieste();
+      await CaricaFestiviGriglia();
       Filtra();
       StateHasChanged();
     }
@@ -386,8 +391,30 @@ else
       var id = _config["GoogleCalendar:CalendarId"];
       if (string.IsNullOrWhiteSpace(id)) return null;
       var tz = _config["GoogleCalendar:TimeZone"] ?? "Europe/Rome";
-      return $"https://calendar.google.com/calendar/embed?src={Uri.EscapeDataString(id)}&ctz={Uri.EscapeDataString(tz)}&mode=MONTH";
+      // Overlay del calendario pubblico delle festività italiane (festivi rossi da Google).
+      var festiviSrc = Uri.EscapeDataString(GoogleCalendarService.FestivitaCalendarId);
+      return $"https://calendar.google.com/calendar/embed?src={Uri.EscapeDataString(id)}&src={festiviSrc}&ctz={Uri.EscapeDataString(tz)}&mode=MONTH";
     }
+  }
+
+  // ---- Festività (lette da Google Calendar, con fallback locale) ----
+  readonly Dictionary<int, HashSet<DateTime>> _festivi = new();
+
+  bool IsFestivo(DateTime g) =>
+      _festivi.TryGetValue(g.Year, out var set) && set.Contains(g.Date);
+
+  async Task CaricaFestivi(int anno)
+  {
+    if (_festivi.ContainsKey(anno)) return;
+    _festivi[anno] = await GCal.GetFestiviAsync(anno);
+  }
+
+  async Task CaricaFestiviGriglia()
+  {
+    // La griglia mostra giorni dei mesi adiacenti: copriamo gli anni coinvolti.
+    var giorni = GiorniGriglia().ToList();
+    foreach (var anno in new[] { giorni.First().Year, meseCorrente.Year, giorni.Last().Year }.Distinct())
+      await CaricaFestivi(anno);
   }
 
   // ---- Calendario ----
@@ -436,9 +463,9 @@ else
     _ => "Rifiutata"
   };
 
-  void MesePrecedente() { meseCorrente = meseCorrente.AddMonths(-1); }
-  void MeseSuccessivo() { meseCorrente = meseCorrente.AddMonths(1); }
-  void VaiOggi() { meseCorrente = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1); }
+  async Task MesePrecedente() { meseCorrente = meseCorrente.AddMonths(-1); await CaricaFestiviGriglia(); }
+  async Task MeseSuccessivo() { meseCorrente = meseCorrente.AddMonths(1); await CaricaFestiviGriglia(); }
+  async Task VaiOggi() { meseCorrente = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1); await CaricaFestiviGriglia(); }
 
   void ApriGiorno(DateTime g, List<RichiestaFerie> eventi)
   {

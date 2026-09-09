@@ -136,6 +136,26 @@
   color: var(--color-primary);
 }
 
+.festivi-periodo {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-danger);
+}
+
+.festivo-tag {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  border: 1px solid #F0BDBD;
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .saldo-preview {
   margin-top: 10px;
   padding: 10px 14px;
