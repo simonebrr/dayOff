@@ -33,6 +33,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddHttpClient();
 builder.Services.AddApexCharts();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddSingleton<GoogleCalendarService>();
 builder.Services.AddScoped<LoginAttemptService>();
 builder.Services.AddScoped<RichiesteService>();
 builder.Services.AddScoped<DipendentiService>();
