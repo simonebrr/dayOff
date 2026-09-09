@@ -34,9 +34,9 @@ public class RichiesteService
     await db.SaveChangesAsync();
 
     // Sincronizza sul calendario Google dell'azienda (solo richieste approvate).
-    var calId = await CalendarIdAziendaAsync(db, richiesta.Utente.AziendaId);
+    var azienda = await GetAziendaAsync(db, richiesta.Utente.AziendaId);
     var nome = $"{richiesta.Utente.Nome} {richiesta.Utente.Cognome}";
-    var eventId = await _gcal.CreaOAggiornaEventoAsync(richiesta, nome, calId);
+    var eventId = await _gcal.CreaOAggiornaEventoAsync(richiesta, nome, azienda);
     if (eventId != richiesta.GoogleCalendarEventId)
     {
       richiesta.GoogleCalendarEventId = eventId;
@@ -61,8 +61,8 @@ public class RichiesteService
     // Se era già a calendario (es. approvata e poi rifiutata), rimuovi l'evento.
     if (!string.IsNullOrWhiteSpace(richiesta.GoogleCalendarEventId))
     {
-      var calId = await CalendarIdAziendaAsync(db, richiesta.Utente.AziendaId);
-      await _gcal.RimuoviEventoAsync(richiesta.GoogleCalendarEventId, calId);
+      var azienda = await GetAziendaAsync(db, richiesta.Utente.AziendaId);
+      await _gcal.RimuoviEventoAsync(richiesta.GoogleCalendarEventId, azienda);
       richiesta.GoogleCalendarEventId = null;
     }
     await db.SaveChangesAsync();
@@ -87,12 +87,12 @@ public class RichiesteService
     }
 
     var eventId = richiesta.GoogleCalendarEventId;
-    var calId = await CalendarIdAziendaAsync(db, richiesta.Utente.AziendaId);
+    var azienda = await GetAziendaAsync(db, richiesta.Utente.AziendaId);
     db.RichiestaFerie.Remove(richiesta);
     await db.SaveChangesAsync();
 
     // Rimuovi l'eventuale evento dal calendario Google dell'azienda.
-    await _gcal.RimuoviEventoAsync(eventId, calId);
+    await _gcal.RimuoviEventoAsync(eventId, azienda);
 
     if (!string.IsNullOrEmpty(emailNotificaHR))
     {
@@ -179,7 +179,7 @@ public class RichiesteService
     var emailDestinatario = utente?.Azienda?.EmailMalattia ?? utente?.Azienda?.Capo?.Email ?? "";
 
     // La malattia non ha un'approvazione: la mettiamo subito a calendario dell'azienda.
-    var gcalEventId = await _gcal.CreaOAggiornaEventoAsync(richiesta, nomeUtente, utente?.Azienda?.GoogleCalendarId);
+    var gcalEventId = await _gcal.CreaOAggiornaEventoAsync(richiesta, nomeUtente, utente?.Azienda);
     if (gcalEventId != richiesta.GoogleCalendarEventId)
     {
       richiesta.GoogleCalendarEventId = gcalEventId;
@@ -195,11 +195,10 @@ public class RichiesteService
     return richiesta;
   }
 
-  private static async Task<string?> CalendarIdAziendaAsync(AppDbContext db, int? aziendaId)
+  private static async Task<Azienda?> GetAziendaAsync(AppDbContext db, int? aziendaId)
   {
     if (aziendaId == null) return null;
-    var azienda = await db.Aziende.FindAsync(aziendaId.Value);
-    return azienda?.GoogleCalendarId;
+    return await db.Aziende.FindAsync(aziendaId.Value);
   }
 
   public async Task<SaldoFerie?> GetSaldoAsync(int utenteId, int anno)

@@ -23,16 +23,20 @@ italiane, in rosso, sempre da Google).
 
    ```json
    "GoogleCalendar": {
-     "CalendarId": "xxxxxxxx@group.calendar.google.com",
-     "ServiceAccountKeyPath": "/data/google-sa.json",
+     "OAuthClientId": "xxxx.apps.googleusercontent.com",
+     "OAuthClientSecret": "xxxx",
+     "CalendarId": "",
+     "ServiceAccountKeyPath": "",
      "ServiceAccountKeyJson": "",
-     "ServiceAccountEmail": "...@...gserviceaccount.com",
+     "ServiceAccountEmail": "",
      "TimeZone": "Europe/Rome"
    }
    ```
 
+   - **`OAuthClientId` / `OAuthClientSecret`** → per il collegamento del capo con
+     un clic (metodo consigliato, vedi sotto).
    - **`CalendarId`** (globale) è il calendario unico della modalità A qui sotto;
-     lascialo vuoto se usi solo calendari per-azienda (modalità B).
+     lascialo vuoto se usi OAuth o solo calendari per-azienda (modalità B).
 
    - Usa **`ServiceAccountKeyPath`** (percorso al file JSON) **oppure**
      **`ServiceAccountKeyJson`** (contenuto JSON inline, utile su hosting come Fly.io
@@ -40,7 +44,24 @@ italiane, in rosso, sempre da Google).
    - **`ServiceAccountEmail`** è solo informativa: viene mostrata al capo come
      l'email con cui condividere il calendario.
 
-### Scelta del calendario: due modalità
+### Collegamento del capo con un clic (OAuth — consigliato)
+
+Il modo più comodo: il capo **non deve configurare nulla a mano**.
+
+Setup (una tantum, owner/dev) in Google Cloud Console:
+1. **Schermata consenso OAuth** → configurala (tipo "Esterno" va bene).
+2. **Credenziali → Crea credenziali → ID client OAuth → Applicazione web**.
+3. Aggiungi come **URI di reindirizzamento autorizzato**:
+   `https://<dominio-app>/google/callback` (e `http://localhost:<porta>/google/callback` per i test).
+4. Copia **Client ID** e **Client Secret** in `GoogleCalendar:OAuthClientId` e
+   `GoogleCalendar:OAuthClientSecret`.
+
+Poi ogni capo, dal proprio **Profilo → La mia azienda**, clicca **«Collega
+account»**, autorizza una volta il suo Google, e le assenze approvate della sua
+azienda finiscono automaticamente nel **suo Google Calendar personale**
+(calendario `primary`). Nessun ID da copiare, nessuna condivisione manuale.
+
+### (Alternativa) Calendario condiviso via service account: due modalità
 
 **A) Un solo calendario (semplice, consigliata).** Crei UN calendario Google,
 lo condividi una volta con il service account e ne metti l'ID nel campo globale

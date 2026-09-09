@@ -1,5 +1,8 @@
 using Google;
 using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2.Flows;
+using Google.Apis.Auth.OAuth2.Requests;
+using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Services;
@@ -13,9 +16,13 @@ namespace GestioneFerie.Web.Services;
 /// globali) scrive su tanti calendari, uno per azienda; l'id del calendario è
 /// salvato su <c>Azienda.GoogleCalendarId</c> e passato ai metodi di sync.
 ///
-/// Autenticazione tramite service account (server-to-server): non serve alcun
-/// login utente. Ogni calendario aziendale va condiviso con l'email del service
-/// account concedendo il permesso "Apportare modifiche agli eventi".
+/// Due modalità di scrittura:
+///  - OAuth del capo (consigliata): il capo collega il proprio account Google con
+///    un clic; gli eventi vanno nel suo calendario personale ("primary"). Ha
+///    precedenza se l'azienda ha un refresh token.
+///  - Service account (server-to-server): scrive su un calendario condiviso
+///    (per-azienda o globale) condiviso con l'email del service account con
+///    permesso "Apportare modifiche agli eventi".
 ///
 /// Configurazione globale (appsettings / variabili d'ambiente):
 ///   GoogleCalendar:ServiceAccountKeyJson   -> contenuto JSON della chiave (opzionale)
@@ -33,6 +40,9 @@ public class GoogleCalendarService
   private readonly object _lock = new();
   private CalendarService? _service;
 
+  private GoogleAuthorizationCodeFlow? _flow;
+  private readonly Dictionary<string, CalendarService> _oauthServices = new();
+
   public GoogleCalendarService(IConfiguration config, ILogger<GoogleCalendarService> logger)
   {
     _config = config;
@@ -47,6 +57,113 @@ public class GoogleCalendarService
   /// <summary>Id azienda se presente, altrimenti il calendario globale.</summary>
   private string? RisolviCalendarId(string? calendarId) =>
       !string.IsNullOrWhiteSpace(calendarId) ? calendarId : CalendarIdGlobale;
+
+  // ===================== OAuth "Connetti Google" (per il capo) =====================
+
+  private string? OAuthClientId => _config["GoogleCalendar:OAuthClientId"];
+  private string? OAuthClientSecret => _config["GoogleCalendar:OAuthClientSecret"];
+
+  /// <summary>True se sono configurate le credenziali OAuth (client id/secret).</summary>
+  public bool OAuthConfigurato =>
+      !string.IsNullOrWhiteSpace(OAuthClientId) && !string.IsNullOrWhiteSpace(OAuthClientSecret);
+
+  private GoogleAuthorizationCodeFlow? GetFlow()
+  {
+    if (!OAuthConfigurato) return null;
+    if (_flow != null) return _flow;
+    lock (_lock)
+    {
+      _flow ??= new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
+      {
+        ClientSecrets = new ClientSecrets { ClientId = OAuthClientId, ClientSecret = OAuthClientSecret },
+        Scopes = new[] { CalendarService.Scope.Calendar }
+      });
+      return _flow;
+    }
+  }
+
+  /// <summary>URL a cui reindirizzare il capo per il consenso Google (null se OAuth non configurato).</summary>
+  public string? BuildAuthUrl(string redirectUri, string? state)
+  {
+    if (!OAuthConfigurato) return null;
+    var req = new GoogleAuthorizationCodeRequestUrl(new Uri(GoogleAuthConsts.AuthorizationUrl))
+    {
+      ClientId = OAuthClientId,
+      Scope = CalendarService.Scope.Calendar,
+      RedirectUri = redirectUri,
+      AccessType = "offline",
+      Prompt = "consent",
+      State = state
+    };
+    return req.Build().ToString();
+  }
+
+  /// <summary>Scambia il codice di autorizzazione con un refresh token (da salvare sull'azienda).</summary>
+  public async Task<string?> ScambiaCodiceAsync(string code, string redirectUri)
+  {
+    var flow = GetFlow();
+    if (flow == null) return null;
+    try
+    {
+      var token = await flow.ExchangeCodeForTokenAsync("user", code, redirectUri, CancellationToken.None);
+      return token.RefreshToken;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Errore nello scambio del codice OAuth Google");
+      return null;
+    }
+  }
+
+  private CalendarService? GetServiceOAuth(string refreshToken)
+  {
+    var flow = GetFlow();
+    if (flow == null) return null;
+
+    lock (_lock)
+    {
+      if (_oauthServices.TryGetValue(refreshToken, out var cached)) return cached;
+      try
+      {
+        var credential = new UserCredential(flow, "user", new TokenResponse { RefreshToken = refreshToken });
+        var svc = new CalendarService(new BaseClientService.Initializer
+        {
+          HttpClientInitializer = credential,
+          ApplicationName = "Gestione Ferie"
+        });
+        _oauthServices[refreshToken] = svc;
+        return svc;
+      }
+      catch (Exception ex)
+      {
+        _logger.LogError(ex, "Errore nella creazione della credenziale OAuth Google");
+        return null;
+      }
+    }
+  }
+
+  /// <summary>
+  /// Determina dove scrivere gli eventi per un'azienda:
+  /// 1) se il capo ha collegato Google (refresh token) → il suo calendario "primary";
+  /// 2) altrimenti il calendario condiviso (azienda o globale) via service account.
+  /// </summary>
+  private (CalendarService? svc, string? calendarId) RisolviTarget(Azienda? azienda)
+  {
+    if (azienda != null && !string.IsNullOrWhiteSpace(azienda.GoogleRefreshToken) && OAuthConfigurato)
+    {
+      var svc = GetServiceOAuth(azienda.GoogleRefreshToken!);
+      if (svc != null) return (svc, "primary");
+    }
+
+    var calId = RisolviCalendarId(azienda?.GoogleCalendarId);
+    if (!string.IsNullOrWhiteSpace(calId))
+    {
+      var svc = GetService();
+      if (svc != null) return (svc, calId);
+    }
+
+    return (null, null);
+  }
 
   /// <summary>Calendario pubblico Google delle festività italiane.</summary>
   public const string FestivitaCalendarId = "it.italian#holiday@group.v.calendar.google.com";
@@ -101,12 +218,10 @@ public class GoogleCalendarService
   /// Ritorna l'id dell'evento da salvare in <see cref="RichiestaFerie.GoogleCalendarEventId"/>,
   /// oppure il valore esistente in caso di errore o servizio non configurato.
   /// </summary>
-  public async Task<string?> CreaOAggiornaEventoAsync(RichiestaFerie r, string nome, string? calendarId)
+  public async Task<string?> CreaOAggiornaEventoAsync(RichiestaFerie r, string nome, Azienda? azienda)
   {
-    calendarId = RisolviCalendarId(calendarId);
-    if (string.IsNullOrWhiteSpace(calendarId)) return r.GoogleCalendarEventId;
-    var svc = GetService();
-    if (svc == null) return r.GoogleCalendarEventId;
+    var (svc, calendarId) = RisolviTarget(azienda);
+    if (svc == null || string.IsNullOrWhiteSpace(calendarId)) return r.GoogleCalendarEventId;
 
     var ev = CostruisciEvento(r, nome);
     try
@@ -137,12 +252,11 @@ public class GoogleCalendarService
   }
 
   /// <summary>Rimuove l'evento dal calendario dell'azienda (no-op se non collegato).</summary>
-  public async Task RimuoviEventoAsync(string? eventId, string? calendarId)
+  public async Task RimuoviEventoAsync(string? eventId, Azienda? azienda)
   {
-    calendarId = RisolviCalendarId(calendarId);
-    if (string.IsNullOrWhiteSpace(eventId) || string.IsNullOrWhiteSpace(calendarId)) return;
-    var svc = GetService();
-    if (svc == null) return;
+    if (string.IsNullOrWhiteSpace(eventId)) return;
+    var (svc, calendarId) = RisolviTarget(azienda);
+    if (svc == null || string.IsNullOrWhiteSpace(calendarId)) return;
 
     try
     {

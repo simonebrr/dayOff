@@ -79,6 +79,26 @@
             }
           </span>
         </div>
+
+        <div class="info-row">
+          <span class="info-label"><Icon Name="calendar" Class="icon-sm" /> Google Calendar</span>
+          <span class="info-value">
+            @if (!string.IsNullOrWhiteSpace(azienda.GoogleRefreshToken))
+            {
+              <span class="gcal-ok"><Icon Name="check-circle" Class="icon-sm icon-success" /> Collegato</span>
+              <a href="/google/disconnect" class="gcal-disc">Scollega</a>
+            }
+            else
+            {
+              <a href="/google/connect" class="btn-primary gcal-connect"><Icon Name="calendar" Class="icon-sm" /> Collega account</a>
+            }
+          </span>
+        </div>
+        <p class="gcal-hint">
+          Collegando il tuo account Google, le assenze approvate della tua azienda
+          compaiono automaticamente nel <strong>tuo</strong> Google Calendar personale.
+          Un solo clic, nessun ID da copiare.
+        </p>
       </div>
     }
   </div>
@@ -124,6 +144,12 @@
         return;
       }
       await CaricaDati();
+
+      if (Nav.Uri.Contains("gok=1")) { messaggio = "Google Calendar collegato con successo!"; errore = false; }
+      else if (Nav.Uri.Contains("gdisc=1")) { messaggio = "Google Calendar scollegato."; errore = false; }
+      else if (Nav.Uri.Contains("gerror=config")) { messaggio = "Collegamento Google non disponibile: OAuth non configurato dall'amministratore."; errore = true; }
+      else if (Nav.Uri.Contains("gerror=1")) { messaggio = "Collegamento a Google non riuscito. Riprova."; errore = true; }
+
       StateHasChanged();
     }
   }
