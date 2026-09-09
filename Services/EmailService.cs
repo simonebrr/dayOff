@@ -18,11 +18,11 @@ public class EmailService
   {
     try
     {
-      var host = _config["Brevo:SmtpHost"] ?? "smtp-relay.brevo.com";
-      var port = int.TryParse(_config["Brevo:SmtpPort"], out var p) ? p : 587;
-      var login = _config["Brevo:SmtpLogin"];
-      // La password SMTP è la chiave "xsmtpsib-..."; per compatibilità accetta anche Brevo:ApiKey.
-      var password = _config["Brevo:SmtpKey"] ?? _config["Brevo:ApiKey"];
+      // Convenzione SMTP generica (Email:*), con fallback ai vecchi nomi Brevo:* per compatibilità.
+      var host = _config["Email:Host"] ?? _config["Brevo:SmtpHost"] ?? "smtp-relay.brevo.com";
+      var port = int.TryParse(_config["Email:Port"] ?? _config["Brevo:SmtpPort"], out var p) ? p : 587;
+      var login = _config["Email:Username"] ?? _config["Brevo:SmtpLogin"];
+      var password = _config["Email:Password"] ?? _config["Brevo:SmtpKey"] ?? _config["Brevo:ApiKey"];
       var from = _config["Email:From"] ?? "sistema.ferie@gmail.com";
 
       if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
