@@ -1,5 +1,5 @@
-using System.Net;
-using System.Net.Mail;
+using System.Text;
+using System.Text.Json;
 
 namespace GestioneFerie.Web.Services;
 
@@ -7,50 +7,53 @@ public class EmailService
 {
   private readonly IConfiguration _config;
   private readonly ILogger<EmailService> _logger;
+  private readonly IHttpClientFactory _httpFactory;
 
-  public EmailService(IConfiguration config, ILogger<EmailService> logger)
+  public EmailService(IConfiguration config, ILogger<EmailService> logger, IHttpClientFactory httpFactory)
   {
     _config = config;
     _logger = logger;
+    _httpFactory = httpFactory;
   }
 
   public async Task InviaAsync(string destinatario, string oggetto, string corpo)
   {
     try
     {
-      // Convenzione SMTP generica (Email:*), con fallback ai vecchi nomi Brevo:* per compatibilità.
-      var host = _config["Email:Host"] ?? _config["Brevo:SmtpHost"] ?? "smtp-relay.brevo.com";
-      var port = int.TryParse(_config["Email:Port"] ?? _config["Brevo:SmtpPort"], out var p) ? p : 587;
-      var login = _config["Email:Username"] ?? _config["Brevo:SmtpLogin"];
-      var password = _config["Email:Password"] ?? _config["Brevo:SmtpKey"] ?? _config["Brevo:ApiKey"];
+      // Invio via API HTTP di Brevo (HTTPS/443). Necessario su hosting come Railway
+      // che bloccano le porte SMTP (25/465/587) → altrimenti "operation timed out".
+      // Serve una API key Brevo "xkeysib-..." (NON la chiave SMTP).
+      var apiKey = _config["Brevo:ApiKey"] ?? _config["Email:Password"];
       var from = _config["Email:From"] ?? "sistema.ferie@gmail.com";
 
-      if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
+      if (string.IsNullOrWhiteSpace(apiKey))
       {
-        _logger.LogWarning("SMTP Brevo non configurato: email a {Destinatario} non inviata", destinatario);
+        _logger.LogWarning("Brevo API key mancante: email a {Destinatario} non inviata", destinatario);
         return;
       }
 
-      _logger.LogInformation("Invio email a {Destinatario} via SMTP Brevo", destinatario);
-
-      using var message = new MailMessage
+      var payload = new
       {
-        From = new MailAddress(from, "Gestione Ferie"),
-        Subject = oggetto,
-        Body = corpo,
-        IsBodyHtml = true
-      };
-      message.To.Add(destinatario);
-
-      using var client = new SmtpClient(host, port)
-      {
-        EnableSsl = true, // STARTTLS sulla porta 587
-        DeliveryMethod = SmtpDeliveryMethod.Network,
-        Credentials = new NetworkCredential(login, password)
+        sender = new { email = from, name = "Gestione Ferie" },
+        to = new[] { new { email = destinatario } },
+        subject = oggetto,
+        htmlContent = corpo
       };
 
-      await client.SendMailAsync(message);
-      _logger.LogInformation("Email inviata con successo a {Destinatario}", destinatario);
+      var http = _httpFactory.CreateClient();
+      http.Timeout = TimeSpan.FromSeconds(20);
+
+      using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
+      request.Headers.Add("api-key", apiKey);
+      request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+      var response = await http.SendAsync(request);
+      var body = await response.Content.ReadAsStringAsync();
+
+      if (response.IsSuccessStatusCode)
+        _logger.LogInformation("Email inviata con successo a {Destinatario}", destinatario);
+      else
+        _logger.LogError("Errore Brevo API: {Status} - {Body}", response.StatusCode, body);
     }
     catch (Exception ex)
     {
