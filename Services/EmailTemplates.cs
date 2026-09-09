@@ -4,6 +4,8 @@ namespace GestioneFerie.Web.Services;
 
 public static class EmailTemplates
 {
+  private const string LinkAccedi = """<a href="https://dayoff-production-10ab.up.railway.app/">ACCEDI</a>""";
+
   public static (string Subject, string Body) RichiestaApprovata(RichiestaFerie r) => (
     "La tua richiesta ferie è stata approvata ✅",
     $"""
@@ -11,6 +13,7 @@ public static class EmailTemplates
     <p>La tua richiesta di <strong>{r.Tipo}</strong> dal <strong>{r.DataInizio:dd/MM/yyyy}</strong> al <strong>{r.DataFine:dd/MM/yyyy}</strong> è stata <strong>approvata</strong>.</p>
     <p>Ore scalate: <strong>{r.OreRichieste}</strong></p>
     <p>Il team HR</p>
+    {LinkAccedi}
     """
   );
 
@@ -21,6 +24,7 @@ public static class EmailTemplates
     <p>La tua richiesta di <strong>{r.Tipo}</strong> dal <strong>{r.DataInizio:dd/MM/yyyy}</strong> al <strong>{r.DataFine:dd/MM/yyyy}</strong> è stata <strong>rifiutata</strong>.</p>
     <p>Motivo: <strong>{r.MotivoRifiuto}</strong></p>
     <p>Il team HR</p>
+    {LinkAccedi}
     """
   );
 
@@ -32,6 +36,7 @@ public static class EmailTemplates
     <p>Dal: <strong>{r.DataInizio:dd/MM/yyyy}</strong> al <strong>{r.DataFine:dd/MM/yyyy}</strong></p>
     <p>Ore: <strong>{r.OreRichieste}</strong></p>
     <p>Stato precedente: <strong>{r.Stato}</strong></p>
+    {LinkAccedi}
     """
   );
 
@@ -47,6 +52,7 @@ public static class EmailTemplates
     <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
     {(preavvisoInsufficiente ? $"<p>⚠️ Richiesta con meno di {RichiesteService.GiorniPreavvisoMinimo} giorni di preavviso.</p>" : "")}
     <p>Accedi al pannello per approvare o rifiutare.</p>
+    {LinkAccedi}
     """
   );
 
@@ -59,6 +65,7 @@ public static class EmailTemplates
     <p>Dal: <strong>{dataInizio:dd/MM/yyyy}</strong></p>
     <p>Al: <strong>{dataFine:dd/MM/yyyy}</strong></p>
     <p>Note: {(string.IsNullOrWhiteSpace(note) ? "—" : note)}</p>
+    {LinkAccedi}
     """
   );
 
@@ -69,6 +76,7 @@ public static class EmailTemplates
     <p>Il tuo saldo ferie per l'anno <strong>{anno}</strong> è stato aggiornato:</p>
     <p>Ore totali: <strong>{oreTotali}</strong></p>
     <p>Il team HR</p>
+    {LinkAccedi}
     """
   );
 
@@ -78,6 +86,7 @@ public static class EmailTemplates
     <p>Ciao {nome},</p>
     <p>Il tuo saldo ferie per l'anno <strong>{anno}</strong> è stato ripristinato a <strong>{orePrecedenti} ore</strong>.</p>
     <p>Il team HR</p>
+    {LinkAccedi}
     """
   );
 
@@ -90,6 +99,7 @@ public static class EmailTemplates
     <p>Password: <strong>{password}</strong></p>
     <p>Ti consigliamo di cambiare la password al primo accesso.</p>
     <p>Il team HR</p>
+    {LinkAccedi}
     """
   );
 
@@ -101,6 +111,7 @@ public static class EmailTemplates
     <p>Email: <strong>{email}</strong></p>
     <p>Password: <strong>{password}</strong></p>
     <p>Accedi e aggiungi i tuoi dipendenti dalla sezione <em>Dipendenti</em>.</p>
+    {LinkAccedi}
     """
   );
 }
