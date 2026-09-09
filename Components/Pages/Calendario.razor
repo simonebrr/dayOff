@@ -4,6 +4,7 @@
 @inject NavigationManager Nav
 @inject IConfiguration _config
 @inject RichiesteService Richieste
+@using System.Globalization
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @using GestioneFerie.Web.Data
@@ -13,21 +14,23 @@
 <PageTitle>Calendario</PageTitle>
 
 <div class="page-header">
-  <h2>Calendario ferie</h2>
-  <p class="subtitle">Visualizza le ferie e permessi</p>
+  <div>
+    <h2>Calendario ferie</h2>
+    <p class="subtitle">Visualizza ferie, permessi e malattie del mese</p>
+  </div>
+  <div class="header-actions">
+    <div class="view-switch">
+      <button class="view-btn @(vista == Vista.Mese ? "active" : "")" @onclick="() => vista = Vista.Mese">
+        <Icon Name="calendar" Class="icon-sm" /> Mese
+      </button>
+      <button class="view-btn @(vista == Vista.Elenco ? "active" : "")" @onclick="() => vista = Vista.Elenco">
+        <Icon Name="clipboard-list" Class="icon-sm" /> Elenco
+      </button>
+    </div>
+  </div>
 </div>
 
 <div class="filtri">
-  <div class="filtro-group">
-    <label>Dal</label>
-    <input type="date" value="@dalData.ToString("yyyy-MM-dd")"
-           @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) { dalData = d; Filtra(); } }" />
-  </div>
-  <div class="filtro-group">
-    <label>Al</label>
-    <input type="date" value="@alData.ToString("yyyy-MM-dd")"
-           @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) { alData = d; Filtra(); } }" />
-  </div>
   <div class="filtro-group">
     <label>Tipo</label>
     <select @bind="tipoScelto" @bind:after="Filtra">
@@ -71,83 +74,185 @@
       }
     </div>
   }
+
+  <div class="legenda">
+    <span class="legenda-item"><span class="legenda-dot dot-ferie"></span> Ferie</span>
+    <span class="legenda-item"><span class="legenda-dot dot-permesso"></span> Permesso</span>
+    <span class="legenda-item"><span class="legenda-dot dot-malattia"></span> Malattia</span>
+    <span class="legenda-item legenda-sep"><span class="legenda-chip pending"></span> In attesa</span>
+  </div>
 </div>
 
-@if (!richieste.Any())
+@if (vista == Vista.Mese)
 {
-  <div class="empty-state"><Icon Name="calendar" Class="icon-lg icon-muted" /> Nessuna richiesta trovata per i filtri selezionati</div>
+  <div class="cal-card">
+    <div class="cal-toolbar">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" title="Mese precedente" @onclick="MesePrecedente"><Icon Name="arrow-left" Class="icon-sm" /></button>
+        <button class="cal-oggi" @onclick="VaiOggi">Oggi</button>
+        <button class="cal-nav-btn" title="Mese successivo" @onclick="MeseSuccessivo"><Icon Name="arrow-right" Class="icon-sm" /></button>
+      </div>
+      <h3 class="cal-titolo">@NomeMese(meseCorrente.Month) <span>@meseCorrente.Year</span></h3>
+      <div class="cal-count">@richieste.Count(r => r.DataInizio <= FineMese && r.DataFine >= InizioMese) eventi</div>
+    </div>
+
+    <div class="cal-grid cal-head">
+      @foreach (var g in giorniSettimana)
+      {
+        <div class="cal-weekday">@g</div>
+      }
+    </div>
+
+    <div class="cal-grid cal-body">
+      @foreach (var giorno in GiorniGriglia())
+      {
+        var eventi = EventiDelGiorno(giorno);
+        var fuoriMese = giorno.Month != meseCorrente.Month;
+        var oggi = giorno.Date == DateTime.Today;
+        <div class="cal-cell @(fuoriMese ? "fuori-mese" : "") @(oggi ? "oggi" : "") @(eventi.Any() ? "ha-eventi" : "")"
+             @onclick="() => ApriGiorno(giorno, eventi)">
+          <div class="cal-daynum @(oggi ? "oggi-num" : "")">@giorno.Day</div>
+          <div class="cal-eventi">
+            @foreach (var r in eventi.Take(3))
+            {
+              <div class="cal-event @TipoClass(r.Tipo) @StatoClass(r.Stato)"
+                   title="@EtichettaEvento(r)">
+                <span class="cal-event-dot"></span>
+                <span class="cal-event-text">@EtichettaEvento(r)</span>
+              </div>
+            }
+            @if (eventi.Count > 3)
+            {
+              <div class="cal-more">+@(eventi.Count - 3) altri</div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
 }
 else
 {
-  <div class="table-card">
-    <table class="table">
-      <thead>
-        <tr>
-          @if (Auth.IsCapo)
-          {
-            <th>Dipendente</th>
-          }
-          <th>Tipo</th>
-          <th>Dal</th>
-          <th>Al</th>
-          <th>Ore</th>
-          <th>Stato</th>
-          <th>Note</th>
-          @if (!Auth.IsCapo)
-          {
-            <th>Azioni</th>
-          }
-        </tr>
-      </thead>
-      <tbody>
-        @foreach (var r in richieste)
-        {
+  @if (!richieste.Any())
+  {
+    <div class="empty-state"><Icon Name="calendar" Class="icon-lg icon-muted" /> Nessuna richiesta trovata per i filtri selezionati</div>
+  }
+  else
+  {
+    <div class="table-card">
+      <table class="table">
+        <thead>
           <tr>
             @if (Auth.IsCapo)
             {
-              <td>@r.Utente.Nome @r.Utente.Cognome</td>
+              <th>Dipendente</th>
             }
-            <td>
-              <span class="badge @BadgeHelper.TipoBadgeClass(r.Tipo)">
-                @r.Tipo
-              </span>
-            </td>
-            <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
-            <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
-            <td>@r.OreRichieste</td>
-            <td><span class="badge @BadgeHelper.StatoBadgeClass(r.Stato)">@r.Stato</span></td>
-            <td>@(r.Note ?? "—")</td>
+            <th>Tipo</th>
+            <th>Dal</th>
+            <th>Al</th>
+            <th>Ore</th>
+            <th>Stato</th>
+            <th>Note</th>
             @if (!Auth.IsCapo)
             {
-              <td>
-                @if (r.Stato == StatoRichiesta.InAttesa || r.Stato == StatoRichiesta.Approvata)
-                {
-                  <button class="btn-elimina" @onclick="() => ApriConfermaElimina(r.Id)"><Icon Name="trash" Class="icon-sm" /> Elimina</button>
-                }
-              </td>
+              <th>Azioni</th>
             }
           </tr>
-        }
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          @foreach (var r in richieste)
+          {
+            <tr>
+              @if (Auth.IsCapo)
+              {
+                <td>@r.Utente.Nome @r.Utente.Cognome</td>
+              }
+              <td>
+                <span class="badge @BadgeHelper.TipoBadgeClass(r.Tipo)">@r.Tipo</span>
+              </td>
+              <td>@r.DataInizio.ToString("dd/MM/yyyy")</td>
+              <td>@r.DataFine.ToString("dd/MM/yyyy")</td>
+              <td>@r.OreRichieste</td>
+              <td><span class="badge @BadgeHelper.StatoBadgeClass(r.Stato)">@r.Stato</span></td>
+              <td>@(r.Note ?? "—")</td>
+              @if (!Auth.IsCapo)
+              {
+                <td>
+                  @if (r.Stato == StatoRichiesta.InAttesa || r.Stato == StatoRichiesta.Approvata)
+                  {
+                    <button class="btn-elimina" @onclick="() => ApriConfermaElimina(r.Id)"><Icon Name="trash" Class="icon-sm" /> Elimina</button>
+                  }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
 
-  <div class="totali">
-    <div class="totale-item">
-      <span class="totale-label">Totale richieste</span>
-      <span class="totale-value">@richieste.Count</span>
+    <div class="totali">
+      <div class="totale-item">
+        <span class="totale-label">Totale richieste</span>
+        <span class="totale-value">@richieste.Count</span>
+      </div>
+      <div class="totale-item">
+        <span class="totale-label">Totale ore</span>
+        <span class="totale-value">@richieste.Sum(r => r.OreRichieste) h</span>
+      </div>
+      <div class="totale-item">
+        <span class="totale-label">Di cui ferie</span>
+        <span class="totale-value">@richieste.Where(r => r.Tipo == TipoRichiesta.Ferie).Sum(r => r.OreRichieste) h</span>
+      </div>
+      <div class="totale-item">
+        <span class="totale-label">Di cui permessi</span>
+        <span class="totale-value">@richieste.Where(r => r.Tipo == TipoRichiesta.Permesso).Sum(r => r.OreRichieste) h</span>
+      </div>
     </div>
-    <div class="totale-item">
-      <span class="totale-label">Totale ore</span>
-      <span class="totale-value">@richieste.Sum(r => r.OreRichieste) h</span>
-    </div>
-    <div class="totale-item">
-      <span class="totale-label">Di cui ferie</span>
-      <span class="totale-value">@richieste.Where(r => r.Tipo == TipoRichiesta.Ferie).Sum(r => r.OreRichieste) h</span>
-    </div>
-    <div class="totale-item">
-      <span class="totale-label">Di cui permessi</span>
-      <span class="totale-value">@richieste.Where(r => r.Tipo == TipoRichiesta.Permesso).Sum(r => r.OreRichieste) h</span>
+  }
+}
+
+@if (giornoSelezionato != null)
+{
+  <div class="modal-overlay" @onclick="ChiudiGiorno">
+    <div class="modal-box giorno-box" @onclick:stopPropagation="true">
+      <div class="giorno-head">
+        <h3>@NomeGiornoCompleto(giornoSelezionato.Value)</h3>
+        <button class="giorno-close" @onclick="ChiudiGiorno"><Icon Name="x" Class="icon-sm" /></button>
+      </div>
+      @if (!eventiGiorno.Any())
+      {
+        <p class="giorno-empty"><Icon Name="calendar" Class="icon-sm icon-muted" /> Nessun evento in questa giornata</p>
+      }
+      else
+      {
+        <div class="giorno-lista">
+          @foreach (var r in eventiGiorno)
+          {
+            <div class="giorno-evento @TipoClass(r.Tipo)">
+              <div class="giorno-evento-top">
+                <span class="badge @BadgeHelper.TipoBadgeClass(r.Tipo)">@r.Tipo</span>
+                <span class="badge @BadgeHelper.StatoBadgeClass(r.Stato)">@StatoLabel(r.Stato)</span>
+              </div>
+              @if (Auth.IsCapo)
+              {
+                <div class="giorno-evento-nome"><Icon Name="users" Class="icon-sm icon-muted" /> @r.Utente.Nome @r.Utente.Cognome</div>
+              }
+              <div class="giorno-evento-info">
+                <span><Icon Name="calendar" Class="icon-sm icon-muted" /> @r.DataInizio.ToString("dd/MM") – @r.DataFine.ToString("dd/MM/yyyy")</span>
+                <span><Icon Name="clock" Class="icon-sm icon-muted" /> @r.OreRichieste h</span>
+              </div>
+              @if (!string.IsNullOrWhiteSpace(r.Note))
+              {
+                <div class="giorno-evento-note">@r.Note</div>
+              }
+              @if (!Auth.IsCapo && (r.Stato == StatoRichiesta.InAttesa || r.Stato == StatoRichiesta.Approvata))
+              {
+                <button class="btn-elimina giorno-elimina" @onclick="() => ApriConfermaElimina(r.Id)"><Icon Name="trash" Class="icon-sm" /> Elimina</button>
+              }
+            </div>
+          }
+        </div>
+      }
     </div>
   </div>
 }
@@ -171,12 +276,17 @@ else
 }
 
 @code {
+  enum Vista { Mese, Elenco }
+  Vista vista = Vista.Mese;
+
   List<RichiestaFerie> richieste = new();
   List<Utente> dipendenti = new();
   List<RichiestaFerie> tutteLeRichieste = new();
 
-  DateTime dalData = new DateTime(DateTime.Now.Year, 1, 1);
-  DateTime alData = new DateTime(DateTime.Now.Year, 12, 31);
+  DateTime meseCorrente = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+  DateTime InizioMese => meseCorrente;
+  DateTime FineMese => meseCorrente.AddMonths(1).AddDays(-1);
+
   string tipoScelto = "";
   string statoScelto = "";
   int dipendenteScelto = 0;
@@ -187,6 +297,14 @@ else
 
   string cercaDipendente = "";
   List<Utente> suggerimenti = new();
+
+  DateTime? giornoSelezionato = null;
+  List<RichiestaFerie> eventiGiorno = new();
+
+  readonly string[] giorniSettimana = { "Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom" };
+  readonly string[] mesiIt = { "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+                               "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre" };
+  readonly string[] giorniIt = { "Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato" };
 
   protected override async Task OnAfterRenderAsync(bool firstRender)
   {
@@ -239,14 +357,76 @@ else
   {
     richieste = tutteLeRichieste.Where(r =>
     {
-      bool okData = r.DataInizio <= alData && r.DataFine >= dalData;
       bool okTipo = string.IsNullOrEmpty(tipoScelto) || r.Tipo.ToString() == tipoScelto;
       bool okStato = string.IsNullOrEmpty(statoScelto) || r.Stato.ToString() == statoScelto;
       bool okDipendente = dipendenteScelto == 0 || r.UtenteId == dipendenteScelto;
-      return okData && okTipo && okStato && okDipendente;
+      return okTipo && okStato && okDipendente;
     }).ToList();
   }
 
+  // ---- Calendario ----
+  string NomeMese(int m) => mesiIt[m - 1];
+
+  string NomeGiornoCompleto(DateTime d) => $"{giorniIt[(int)d.DayOfWeek]} {d.Day} {NomeMese(d.Month).ToLower()} {d.Year}";
+
+  IEnumerable<DateTime> GiorniGriglia()
+  {
+    var primo = InizioMese;
+    // Lunedì = 0 ... Domenica = 6
+    int offset = ((int)primo.DayOfWeek + 6) % 7;
+    var start = primo.AddDays(-offset);
+    for (int i = 0; i < 42; i++)
+    {
+      yield return start.AddDays(i);
+    }
+  }
+
+  List<RichiestaFerie> EventiDelGiorno(DateTime g) =>
+      richieste.Where(r => r.DataInizio.Date <= g.Date && r.DataFine.Date >= g.Date)
+               .OrderBy(r => r.Tipo)
+               .ToList();
+
+  string EtichettaEvento(RichiestaFerie r) =>
+      Auth.IsCapo ? $"{r.Utente.Nome} {r.Utente.Cognome}" : r.Tipo.ToString();
+
+  string TipoClass(TipoRichiesta t) => t switch
+  {
+    TipoRichiesta.Ferie => "ev-ferie",
+    TipoRichiesta.Permesso => "ev-permesso",
+    _ => "ev-malattia"
+  };
+
+  string StatoClass(StatoRichiesta s) => s switch
+  {
+    StatoRichiesta.InAttesa => "ev-attesa",
+    StatoRichiesta.Rifiutata => "ev-rifiutata",
+    _ => "ev-approvata"
+  };
+
+  string StatoLabel(StatoRichiesta s) => s switch
+  {
+    StatoRichiesta.InAttesa => "In attesa",
+    StatoRichiesta.Approvata => "Approvata",
+    _ => "Rifiutata"
+  };
+
+  void MesePrecedente() { meseCorrente = meseCorrente.AddMonths(-1); }
+  void MeseSuccessivo() { meseCorrente = meseCorrente.AddMonths(1); }
+  void VaiOggi() { meseCorrente = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1); }
+
+  void ApriGiorno(DateTime g, List<RichiestaFerie> eventi)
+  {
+    giornoSelezionato = g;
+    eventiGiorno = eventi;
+  }
+
+  void ChiudiGiorno()
+  {
+    giornoSelezionato = null;
+    eventiGiorno = new();
+  }
+
+  // ---- Eliminazione ----
   void ApriConfermaElimina(int id)
   {
     richiestaEliminaId = id;
@@ -264,10 +444,13 @@ else
     if (richiesta == null) return;
 
     tutteLeRichieste.RemoveAll(r => r.Id == richiestaEliminaId);
+    eventiGiorno.RemoveAll(r => r.Id == richiestaEliminaId);
+    if (giornoSelezionato != null && !eventiGiorno.Any()) ChiudiGiorno();
     Filtra();
     await InvokeAsync(StateHasChanged);
   }
 
+  // ---- Autocomplete dipendente ----
   void OnFocusDipendente()
   {
     suggerimenti = string.IsNullOrWhiteSpace(cercaDipendente)
