@@ -41,6 +41,13 @@ public class GoogleCalendarService
 
   private string TimeZone => _config["GoogleCalendar:TimeZone"] ?? "Europe/Rome";
 
+  /// <summary>Calendario globale di fallback (owner), usato se l'azienda non ne ha uno proprio.</summary>
+  private string? CalendarIdGlobale => _config["GoogleCalendar:CalendarId"];
+
+  /// <summary>Id azienda se presente, altrimenti il calendario globale.</summary>
+  private string? RisolviCalendarId(string? calendarId) =>
+      !string.IsNullOrWhiteSpace(calendarId) ? calendarId : CalendarIdGlobale;
+
   /// <summary>Calendario pubblico Google delle festività italiane.</summary>
   public const string FestivitaCalendarId = "it.italian#holiday@group.v.calendar.google.com";
 
@@ -96,6 +103,7 @@ public class GoogleCalendarService
   /// </summary>
   public async Task<string?> CreaOAggiornaEventoAsync(RichiestaFerie r, string nome, string? calendarId)
   {
+    calendarId = RisolviCalendarId(calendarId);
     if (string.IsNullOrWhiteSpace(calendarId)) return r.GoogleCalendarEventId;
     var svc = GetService();
     if (svc == null) return r.GoogleCalendarEventId;
@@ -131,6 +139,7 @@ public class GoogleCalendarService
   /// <summary>Rimuove l'evento dal calendario dell'azienda (no-op se non collegato).</summary>
   public async Task RimuoviEventoAsync(string? eventId, string? calendarId)
   {
+    calendarId = RisolviCalendarId(calendarId);
     if (string.IsNullOrWhiteSpace(eventId) || string.IsNullOrWhiteSpace(calendarId)) return;
     var svc = GetService();
     if (svc == null) return;
