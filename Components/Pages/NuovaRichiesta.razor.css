@@ -1,20 +1,103 @@
+.saldo-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-xs);
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .saldo-bar {
   display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  gap: 1.5rem;
   flex-wrap: wrap;
 }
 
 .saldo-item {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 1rem 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-width: 110px;
+}
+
+.saldo-progress {
+  margin-top: 1rem;
+  height: 8px;
+  background: var(--color-bg);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.saldo-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary) 0%, #22AC81 100%);
+  border-radius: var(--radius-pill);
+  transition: width var(--transition);
+}
+
+/* Selettore tipo a segmenti */
+.tipo-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.tipo-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 10px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.tipo-opt .icon {
+  color: var(--color-text-faint);
+  transition: color var(--transition-fast);
+}
+
+.tipo-opt:hover {
+  border-color: var(--color-border-strong);
+  background: #FAFBFC;
+}
+
+.tipo-opt.active {
   box-shadow: var(--shadow-xs);
 }
+
+.tipo-opt.tipo-ferie.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+}
+.tipo-opt.tipo-ferie.active .icon { color: var(--color-primary); }
+
+.tipo-opt.tipo-permesso.active {
+  border-color: var(--color-info);
+  background: var(--color-info-light);
+  color: var(--color-info);
+}
+.tipo-opt.tipo-permesso.active .icon { color: var(--color-info); }
+
+.tipo-opt.tipo-malattia.active {
+  border-color: var(--color-purple);
+  background: var(--color-purple-light);
+  color: var(--color-purple);
+}
+.tipo-opt.tipo-malattia.active .icon { color: var(--color-purple); }
 
 .saldo-label {
   font-size: 12px;
@@ -51,6 +134,157 @@
   font-size: 22px;
   font-weight: 600;
   color: var(--color-primary);
+}
+
+/* Campi periodo + popup calendario */
+.periodo-wrap {
+  position: relative;
+}
+
+.date-field {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition-fast);
+}
+
+.date-field:hover { border-color: var(--color-border-strong); }
+.date-field.attivo { border-color: var(--color-primary); }
+
+.picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.picker-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  width: 320px;
+  max-width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.mc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  background: #FAFBFC;
+}
+
+.mc-title { font-size: 14px; font-weight: 600; color: var(--color-text); }
+
+.mc-nav-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.mc-nav-btn:hover { background: var(--color-primary-light); color: var(--color-primary-dark); }
+
+.mc-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.mc-head { border-bottom: 1px solid var(--color-border); }
+
+.mc-weekday {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: 7px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.mc-weekday:last-child { color: var(--color-danger); }
+
+.mc-day {
+  aspect-ratio: 1 / 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.mc-day:hover:not(.disabled):not(.start):not(.end) { background: var(--color-primary-light); }
+.mc-day.fuori { color: var(--color-text-faint); }
+.mc-day.disabled { color: var(--color-text-faint); cursor: not-allowed; opacity: 0.45; }
+.mc-day.oggi { font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--color-primary); border-radius: 50%; }
+.mc-day.rosso { color: var(--color-danger-strong); font-weight: 600; }
+.mc-day.range { background: var(--color-primary-light); }
+.mc-day.start, .mc-day.end { background: var(--color-primary); color: #fff; font-weight: 600; }
+
+.picker-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.picker-hint { font-size: 12px; color: var(--color-text-muted); }
+
+.picker-link {
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.picker-link:hover { text-decoration: underline; }
+
+.festivi-periodo {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-danger);
+}
+
+.festivo-tag {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  border: 1px solid #F0BDBD;
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .saldo-preview {

@@ -10,11 +10,13 @@ public class RichiesteService
 
   private readonly IDbContextFactory<AppDbContext> _dbFactory;
   private readonly EmailService _email;
+  private readonly GoogleCalendarService _gcal;
 
-  public RichiesteService(IDbContextFactory<AppDbContext> dbFactory, EmailService email)
+  public RichiesteService(IDbContextFactory<AppDbContext> dbFactory, EmailService email, GoogleCalendarService gcal)
   {
     _dbFactory = dbFactory;
     _email = email;
+    _gcal = gcal;
   }
 
   public static bool PreavvisoInsufficiente(DateTime dataInizio) =>
@@ -31,6 +33,16 @@ public class RichiesteService
     if (saldo != null) saldo.OreUsate += richiesta.OreRichieste;
     await db.SaveChangesAsync();
 
+    // Sincronizza sul calendario Google dell'azienda (solo richieste approvate).
+    var azienda = await GetAziendaAsync(db, richiesta.Utente.AziendaId);
+    var nome = $"{richiesta.Utente.Nome} {richiesta.Utente.Cognome}";
+    var eventId = await _gcal.CreaOAggiornaEventoAsync(richiesta, nome, azienda);
+    if (eventId != richiesta.GoogleCalendarEventId)
+    {
+      richiesta.GoogleCalendarEventId = eventId;
+      await db.SaveChangesAsync();
+    }
+
     var (subject, body) = EmailTemplates.RichiestaApprovata(richiesta);
     await _email.InviaAsync(richiesta.Utente.Email, subject, body);
 
@@ -45,6 +57,14 @@ public class RichiesteService
 
     richiesta.Stato = StatoRichiesta.Rifiutata;
     richiesta.MotivoRifiuto = motivo;
+
+    // Se era già a calendario (es. approvata e poi rifiutata), rimuovi l'evento.
+    if (!string.IsNullOrWhiteSpace(richiesta.GoogleCalendarEventId))
+    {
+      var azienda = await GetAziendaAsync(db, richiesta.Utente.AziendaId);
+      await _gcal.RimuoviEventoAsync(richiesta.GoogleCalendarEventId, azienda);
+      richiesta.GoogleCalendarEventId = null;
+    }
     await db.SaveChangesAsync();
 
     var (subject, body) = EmailTemplates.RichiestaRifiutata(richiesta);
@@ -66,8 +86,13 @@ public class RichiesteService
       if (saldo != null) saldo.OreUsate -= richiesta.OreRichieste;
     }
 
+    var eventId = richiesta.GoogleCalendarEventId;
+    var azienda = await GetAziendaAsync(db, richiesta.Utente.AziendaId);
     db.RichiestaFerie.Remove(richiesta);
     await db.SaveChangesAsync();
+
+    // Rimuovi l'eventuale evento dal calendario Google dell'azienda.
+    await _gcal.RimuoviEventoAsync(eventId, azienda);
 
     if (!string.IsNullOrEmpty(emailNotificaHR))
     {
@@ -153,6 +178,14 @@ public class RichiesteService
         .FirstOrDefaultAsync(u => u.Id == utenteId);
     var emailDestinatario = utente?.Azienda?.EmailMalattia ?? utente?.Azienda?.Capo?.Email ?? "";
 
+    // La malattia non ha un'approvazione: la mettiamo subito a calendario dell'azienda.
+    var gcalEventId = await _gcal.CreaOAggiornaEventoAsync(richiesta, nomeUtente, utente?.Azienda);
+    if (gcalEventId != richiesta.GoogleCalendarEventId)
+    {
+      richiesta.GoogleCalendarEventId = gcalEventId;
+      await db.SaveChangesAsync();
+    }
+
     if (!string.IsNullOrEmpty(emailDestinatario))
     {
       var (subject, body) = EmailTemplates.SegnalazioneMalattia(nomeUtente, codiceMalattia, dataInizio, dataFine, note);
@@ -160,6 +193,12 @@ public class RichiesteService
     }
 
     return richiesta;
+  }
+
+  private static async Task<Azienda?> GetAziendaAsync(AppDbContext db, int? aziendaId)
+  {
+    if (aziendaId == null) return null;
+    return await db.Aziende.FindAsync(aziendaId.Value);
   }
 
   public async Task<SaldoFerie?> GetSaldoAsync(int utenteId, int anno)

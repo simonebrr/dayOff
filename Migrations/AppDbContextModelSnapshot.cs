@@ -29,6 +29,12 @@ namespace GestioneFerie.Web.Migrations
                     b.Property<string>("EmailMalattia")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("GoogleCalendarId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GoogleRefreshToken")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("TEXT");

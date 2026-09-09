@@ -1,5 +1,5 @@
-using System.Text;
-using System.Text.Json;
+using System.Net;
+using System.Net.Mail;
 
 namespace GestioneFerie.Web.Services;
 
@@ -7,44 +7,50 @@ public class EmailService
 {
   private readonly IConfiguration _config;
   private readonly ILogger<EmailService> _logger;
-  private readonly HttpClient _http;
 
-  public EmailService(IConfiguration config, ILogger<EmailService> logger, IHttpClientFactory httpFactory)
+  public EmailService(IConfiguration config, ILogger<EmailService> logger)
   {
     _config = config;
     _logger = logger;
-    _http = httpFactory.CreateClient();
   }
 
   public async Task InviaAsync(string destinatario, string oggetto, string corpo)
   {
     try
     {
-      var apiKey = _config["Brevo:ApiKey"];
+      var host = _config["Brevo:SmtpHost"] ?? "smtp-relay.brevo.com";
+      var port = int.TryParse(_config["Brevo:SmtpPort"], out var p) ? p : 587;
+      var login = _config["Brevo:SmtpLogin"];
+      // La password SMTP è la chiave "xsmtpsib-..."; per compatibilità accetta anche Brevo:ApiKey.
+      var password = _config["Brevo:SmtpKey"] ?? _config["Brevo:ApiKey"];
       var from = _config["Email:From"] ?? "sistema.ferie@gmail.com";
 
-      _logger.LogInformation("Invio email a {Destinatario} via Brevo API", destinatario);
-
-      var payload = new
+      if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
       {
-        sender = new { email = from, name = "Gestione Ferie" },
-        to = new[] { new { email = destinatario } },
-        subject = oggetto,
-        htmlContent = corpo
+        _logger.LogWarning("SMTP Brevo non configurato: email a {Destinatario} non inviata", destinatario);
+        return;
+      }
+
+      _logger.LogInformation("Invio email a {Destinatario} via SMTP Brevo", destinatario);
+
+      using var message = new MailMessage
+      {
+        From = new MailAddress(from, "Gestione Ferie"),
+        Subject = oggetto,
+        Body = corpo,
+        IsBodyHtml = true
+      };
+      message.To.Add(destinatario);
+
+      using var client = new SmtpClient(host, port)
+      {
+        EnableSsl = true, // STARTTLS sulla porta 587
+        DeliveryMethod = SmtpDeliveryMethod.Network,
+        Credentials = new NetworkCredential(login, password)
       };
 
-      var json = JsonSerializer.Serialize(payload);
-      var request = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
-      request.Headers.Add("api-key", apiKey);
-      request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-
-      var response = await _http.SendAsync(request);
-      var responseBody = await response.Content.ReadAsStringAsync();
-
-      if (response.IsSuccessStatusCode)
-        _logger.LogInformation("Email inviata con successo a {Destinatario}", destinatario);
-      else
-        _logger.LogError("Errore Brevo API: {Status} - {Body}", response.StatusCode, responseBody);
+      await client.SendMailAsync(message);
+      _logger.LogInformation("Email inviata con successo a {Destinatario}", destinatario);
     }
     catch (Exception ex)
     {

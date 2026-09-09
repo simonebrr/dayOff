@@ -2,6 +2,7 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject RichiesteService Richieste
+@inject GoogleCalendarService GCal
 @using GestioneFerie.Web.Services
 @using GestioneFerie.Web.Models
 @rendermode InteractiveServer
@@ -22,19 +23,27 @@
 {
   @if (saldo != null)
   {
-    <div class="saldo-bar">
-      <div class="saldo-item">
-        <span class="saldo-label">Ore totali anno @DateTime.Now.Year</span>
-        <span class="saldo-value">@saldo.OreTotali h</span>
+    <div class="saldo-card">
+      <div class="saldo-bar">
+        <div class="saldo-item">
+          <span class="saldo-label">Ore totali @DateTime.Now.Year</span>
+          <span class="saldo-value">@saldo.OreTotali h</span>
+        </div>
+        <div class="saldo-item">
+          <span class="saldo-label">Ore usate</span>
+          <span class="saldo-value warning">@saldo.OreUsate h</span>
+        </div>
+        <div class="saldo-item">
+          <span class="saldo-label">Ore disponibili</span>
+          <span class="saldo-value success">@saldo.OreDisponibili h</span>
+        </div>
       </div>
-      <div class="saldo-item">
-        <span class="saldo-label">Ore usate</span>
-        <span class="saldo-value warning">@saldo.OreUsate h</span>
-      </div>
-      <div class="saldo-item">
-        <span class="saldo-label">Ore disponibili</span>
-        <span class="saldo-value success">@saldo.OreDisponibili h</span>
-      </div>
+      @if (saldo.OreTotali > 0)
+      {
+        <div class="saldo-progress" title="@saldo.OreUsate h su @saldo.OreTotali h utilizzate">
+          <div class="saldo-progress-fill" style="width:@(Math.Min(100, (double)saldo.OreUsate / (double)saldo.OreTotali * 100).ToString(System.Globalization.CultureInfo.InvariantCulture))%"></div>
+        </div>
+      }
     </div>
   }
   else
@@ -48,11 +57,20 @@
 <div class="form-card">
   <div class="form-group">
     <label>Tipo richiesta</label>
-    <select @bind="tipo" @bind:after="CalcolaOre">
-      <option value="Ferie">Ferie</option>
-      <option value="Permesso">Permesso</option>
-      <option value="Malattia">Malattia</option>
-    </select>
+    <div class="tipo-selector">
+      <button type="button" class="tipo-opt tipo-ferie @(tipo == "Ferie" ? "active" : "")" @onclick='() => CambiaTipo("Ferie")'>
+        <Icon Name="sun" Class="icon-lg" />
+        <span>Ferie</span>
+      </button>
+      <button type="button" class="tipo-opt tipo-permesso @(tipo == "Permesso" ? "active" : "")" @onclick='() => CambiaTipo("Permesso")'>
+        <Icon Name="clock" Class="icon-lg" />
+        <span>Permesso</span>
+      </button>
+      <button type="button" class="tipo-opt tipo-malattia @(tipo == "Malattia" ? "active" : "")" @onclick='() => CambiaTipo("Malattia")'>
+        <Icon Name="thermometer" Class="icon-lg" />
+        <span>Malattia</span>
+      </button>
+    </div>
   </div>
 
   @if (tipo == "Malattia")
@@ -64,31 +82,60 @@
     </div>
   }
 
-  <div class="form-row">
-    <div class="form-group">
-      <label>Data inizio</label>
-      <input type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@dataInizio.ToString("yyyy-MM-dd")"
-             @onchange="async e => {
-               if (DateTime.TryParse(e.Value?.ToString(), out var d))
-               {
-                 dataInizio = DateTime.SpecifyKind(d, DateTimeKind.Local);
-                 await CalcolaOre();
-               }
-             }
-      " />
+  <div class="periodo-wrap">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Data inizio</label>
+        <button type="button" class="date-field @(pickerAperto ? "attivo" : "")" @onclick="TogglePicker">
+          <Icon Name="calendar" Class="icon-sm icon-muted" /> @dataInizio.ToString("dd/MM/yyyy")
+        </button>
+      </div>
+      <div class="form-group">
+        <label>Data fine</label>
+        <button type="button" class="date-field @(pickerAperto ? "attivo" : "")" @onclick="TogglePicker">
+          <Icon Name="calendar" Class="icon-sm icon-muted" /> @dataFine.ToString("dd/MM/yyyy")
+        </button>
+      </div>
     </div>
-    <div class="form-group">
-      <label>Data fine</label>
-      <input type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@dataFine.ToString("yyyy-MM-dd")"
-             @onchange="async e => {
-               if (DateTime.TryParse(e.Value?.ToString(), out var d))
-               {
-                 dataFine = DateTime.SpecifyKind(d, DateTimeKind.Local);
-                 await CalcolaOre();
-               }
-             }
-      " />
-    </div>
+
+    @if (pickerAperto)
+    {
+      <div class="picker-backdrop" @onclick="ChiudiPicker"></div>
+      <div class="picker-pop">
+        <div class="mc-toolbar">
+          <button type="button" class="mc-nav-btn" title="Mese precedente" @onclick="PickerMesePrec"><Icon Name="arrow-left" Class="icon-sm" /></button>
+          <span class="mc-title">@mesiIt[pickerMese.Month - 1] @pickerMese.Year</span>
+          <button type="button" class="mc-nav-btn" title="Mese successivo" @onclick="PickerMeseSucc"><Icon Name="arrow-right" Class="icon-sm" /></button>
+        </div>
+        <div class="mc-grid mc-head">
+          @foreach (var g in giorniSettimana)
+          {
+            <div class="mc-weekday">@g</div>
+          }
+        </div>
+        <div class="mc-grid">
+          @foreach (var d in GiorniGrigliaPicker())
+          {
+            var fuori = d.Month != pickerMese.Month;
+            var passato = d.Date < DateTime.Today;
+            var inizio = d.Date == dataInizio.Date;
+            var fine = d.Date == dataFine.Date;
+            var inRange = d.Date > dataInizio.Date && d.Date < dataFine.Date;
+            var oggi = d.Date == DateTime.Today;
+            var rosso = IsFestivo(d) || d.DayOfWeek == DayOfWeek.Sunday;
+            <button type="button"
+                    class="mc-day @(fuori ? "fuori" : "") @(passato ? "disabled" : "") @(inizio ? "start" : "") @(fine ? "end" : "") @(inRange ? "range" : "") @(oggi && !inizio && !fine ? "oggi" : "") @(rosso && !inizio && !fine ? "rosso" : "")"
+                    disabled="@passato"
+                    title="@(IsFestivo(d) ? "Festività" : null)"
+                    @onclick="() => SelezionaGiorno(d)">@d.Day</button>
+          }
+        </div>
+        <div class="picker-foot">
+          <span class="picker-hint">@(attesaFine ? "Scegli il giorno di fine" : "Scegli il giorno di inizio")</span>
+          <button type="button" class="picker-link" @onclick="ChiudiPicker">Fatto</button>
+        </div>
+      </div>
+    }
   </div>
 
   @if (tipo == "Ferie")
@@ -97,8 +144,19 @@
       <label>Giorni lavorativi selezionati</label>
       <div class="ore-display">
         <span class="ore-numero">@giorniLavorativi</span>
-        <span class="ore-label">giorni → <strong>@ore ore</strong> (esclusi weekend e festivi italiani)</span>
+        <span class="ore-label">giorni → <strong>@ore ore</strong> (esclusi weekend e festivi)</span>
       </div>
+      @if (festiviPeriodo.Any())
+      {
+        <div class="festivi-periodo">
+          <Icon Name="calendar" Class="icon-sm" />
+          <span>Festività nel periodo (non conteggiate):</span>
+          @foreach (var f in festiviPeriodo)
+          {
+            <span class="festivo-tag">@f.ToString("dd/MM")</span>
+          }
+        </div>
+      }
       @if (saldo != null)
       {
         <div class="saldo-preview @(saldo.OreDisponibili - ore < 0 ? "saldo-negativo" : "saldo-positivo")">
@@ -183,6 +241,75 @@
   string nomeCapo = "";
   SaldoFerie? saldo;
 
+  // ---- Popup calendario (selezione periodo) ----
+  bool pickerAperto = false;
+  DateTime pickerMese = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+  bool attesaFine = false;
+  readonly string[] giorniSettimana = { "Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom" };
+  readonly string[] mesiIt = { "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+                               "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre" };
+
+  IEnumerable<DateTime> GiorniGrigliaPicker()
+  {
+    var primo = new DateTime(pickerMese.Year, pickerMese.Month, 1);
+    int offset = ((int)primo.DayOfWeek + 6) % 7;
+    var start = primo.AddDays(-offset);
+    for (int i = 0; i < 42; i++) yield return start.AddDays(i);
+  }
+
+  bool IsFestivo(DateTime d) =>
+      _festiviAnno.TryGetValue(d.Year, out var s) && s.Contains(d.Date);
+
+  async Task EnsureFestiviPicker()
+  {
+    var giorni = GiorniGrigliaPicker().ToList();
+    await EnsureFestivi(giorni.First().Year);
+    await EnsureFestivi(giorni.Last().Year);
+  }
+
+  async Task TogglePicker()
+  {
+    pickerAperto = !pickerAperto;
+    if (pickerAperto)
+    {
+      pickerMese = new DateTime(dataInizio.Year, dataInizio.Month, 1);
+      attesaFine = false;
+      await EnsureFestiviPicker();
+    }
+  }
+
+  void ChiudiPicker() => pickerAperto = false;
+
+  async Task PickerMesePrec() { pickerMese = pickerMese.AddMonths(-1); await EnsureFestiviPicker(); }
+  async Task PickerMeseSucc() { pickerMese = pickerMese.AddMonths(1); await EnsureFestiviPicker(); }
+
+  async Task SelezionaGiorno(DateTime d)
+  {
+    if (d.Date < DateTime.Today) return;
+
+    if (!attesaFine)
+    {
+      dataInizio = DateTime.SpecifyKind(d.Date, DateTimeKind.Local);
+      dataFine = dataInizio;
+      attesaFine = true;
+    }
+    else
+    {
+      if (d.Date >= dataInizio.Date)
+      {
+        dataFine = DateTime.SpecifyKind(d.Date, DateTimeKind.Local);
+      }
+      else
+      {
+        dataFine = dataInizio;
+        dataInizio = DateTime.SpecifyKind(d.Date, DateTimeKind.Local);
+      }
+      attesaFine = false;
+      pickerAperto = false;
+    }
+    await CalcolaOre();
+  }
+
   protected override async Task OnAfterRenderAsync(bool firstRender)
   {
     if (firstRender)
@@ -201,20 +328,49 @@
     }
   }
 
-  Task CalcolaOre()
+  async Task CambiaTipo(string nuovoTipo)
+  {
+    tipo = nuovoTipo;
+    messaggio = "";
+    await CalcolaOre();
+  }
+
+  readonly Dictionary<int, HashSet<DateTime>> _festiviAnno = new();
+  List<DateTime> festiviPeriodo = new();
+
+  async Task<HashSet<DateTime>> EnsureFestivi(int anno)
+  {
+    if (!_festiviAnno.TryGetValue(anno, out var s))
+    {
+      s = await GCal.GetFestiviAsync(anno);
+      _festiviAnno[anno] = s;
+    }
+    return s;
+  }
+
+  async Task CalcolaOre()
   {
     if (tipo == "Ferie")
     {
-      giorniLavorativi = HolidayCalculator.GiorniLavorativi(dataInizio, dataFine);
+      var festivi = new HashSet<DateTime>(await EnsureFestivi(dataInizio.Year));
+      if (dataFine.Year != dataInizio.Year)
+        festivi.UnionWith(await EnsureFestivi(dataFine.Year));
+
+      giorniLavorativi = HolidayCalculator.GiorniLavorativi(dataInizio, dataFine, festivi);
       ore = giorniLavorativi * 8;
+
+      festiviPeriodo = new();
+      if (dataFine.Date >= dataInizio.Date)
+        for (var d = dataInizio.Date; d <= dataFine.Date; d = d.AddDays(1))
+          if (festivi.Contains(d.Date)) festiviPeriodo.Add(d);
     }
     else
     {
       giorniLavorativi = 0;
+      festiviPeriodo = new();
       if (tipo == "Malattia") ore = 0;
     }
     StateHasChanged();
-    return Task.CompletedTask;
   }
 
   async Task InviaRichiesta()
@@ -291,6 +447,9 @@
     tipo = "Ferie";
     dataInizio = DateTime.Today;
     dataFine = DateTime.Today;
+    pickerAperto = false;
+    attesaFine = false;
+    pickerMese = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
     note = "";
     codiceMalattia = "";
     await CalcolaOre();

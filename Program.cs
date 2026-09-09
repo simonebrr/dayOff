@@ -33,6 +33,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddHttpClient();
 builder.Services.AddApexCharts();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddSingleton<GoogleCalendarService>();
 builder.Services.AddScoped<LoginAttemptService>();
 builder.Services.AddScoped<RichiesteService>();
 builder.Services.AddScoped<DipendentiService>();
@@ -52,7 +53,7 @@ builder.Services.Configure<CookiePolicyOptions>(options =>
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
   options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-  options.KnownNetworks.Clear();
+  options.KnownIPNetworks.Clear();
   options.KnownProxies.Clear();
 });
 
@@ -113,6 +114,57 @@ app.MapGet("/auth/logout", (HttpContext ctx) =>
   ctx.Response.Cookies.Delete("uruolo");
   ctx.Response.Cookies.Delete("uazienda");
   return Results.Redirect("/login");
+});
+
+// --- OAuth Google Calendar (collegamento account del capo) ---
+app.MapGet("/google/connect", (HttpContext ctx, GoogleCalendarService gcal) =>
+{
+  if (ctx.Request.Cookies["uruolo"] != "Capo") return Results.Redirect("/login");
+  if (!gcal.OAuthConfigurato) return Results.Redirect("/profilo?gerror=config");
+
+  var redirectUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}/google/callback";
+  var url = gcal.BuildAuthUrl(redirectUri, null);
+  return string.IsNullOrEmpty(url) ? Results.Redirect("/profilo?gerror=config") : Results.Redirect(url);
+});
+
+app.MapGet("/google/callback", async (HttpContext ctx,
+    GoogleCalendarService gcal, IDbContextFactory<AppDbContext> dbFactory) =>
+{
+  if (ctx.Request.Cookies["uruolo"] != "Capo" ||
+      !int.TryParse(ctx.Request.Cookies["uazienda"], out var aziendaId) || aziendaId == 0)
+    return Results.Redirect("/login");
+
+  var code = ctx.Request.Query["code"].ToString();
+  if (string.IsNullOrEmpty(code)) return Results.Redirect("/profilo?gerror=1");
+
+  var redirectUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}/google/callback";
+  var refresh = await gcal.ScambiaCodiceAsync(code, redirectUri);
+  if (string.IsNullOrEmpty(refresh)) return Results.Redirect("/profilo?gerror=1");
+
+  using var db = dbFactory.CreateDbContext();
+  var azienda = await db.Aziende.FindAsync(aziendaId);
+  if (azienda != null)
+  {
+    azienda.GoogleRefreshToken = refresh;
+    await db.SaveChangesAsync();
+  }
+  return Results.Redirect("/profilo?gok=1");
+});
+
+app.MapGet("/google/disconnect", async (HttpContext ctx, IDbContextFactory<AppDbContext> dbFactory) =>
+{
+  if (ctx.Request.Cookies["uruolo"] != "Capo" ||
+      !int.TryParse(ctx.Request.Cookies["uazienda"], out var aziendaId) || aziendaId == 0)
+    return Results.Redirect("/login");
+
+  using var db = dbFactory.CreateDbContext();
+  var azienda = await db.Aziende.FindAsync(aziendaId);
+  if (azienda != null)
+  {
+    azienda.GoogleRefreshToken = null;
+    await db.SaveChangesAsync();
+  }
+  return Results.Redirect("/profilo?gdisc=1");
 });
 
 app.MapRazorComponents<App>()
