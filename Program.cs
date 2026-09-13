@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using ApexCharts;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.DataProtection;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,6 +45,21 @@ builder.Services.AddServerSideBlazor(options =>
   options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(30);
 });
 
+// Rate limiter globale: max 200 richieste/minuto per IP (gli asset statici sono
+// esentati perché serviti prima nel pipeline). Protegge da abusi/DoS di base.
+builder.Services.AddRateLimiter(options =>
+{
+  options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+  options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
+      RateLimitPartition.GetFixedWindowLimiter(
+          http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+          _ => new FixedWindowRateLimiterOptions
+          {
+            PermitLimit = 200,
+            Window = TimeSpan.FromMinutes(1)
+          }));
+});
+
 builder.Services.Configure<CookiePolicyOptions>(options =>
 {
   options.MinimumSameSitePolicy = SameSiteMode.None;
@@ -62,6 +78,7 @@ var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseWebSockets();
 app.UseStaticFiles();
+app.UseRateLimiter();
 app.UseCookiePolicy();
 app.UseAntiforgery();
 
